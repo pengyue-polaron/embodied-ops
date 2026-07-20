@@ -1,62 +1,69 @@
-# embodied-ops
+<h1 align="center">embodied-ops</h1>
 
-`embodied-ops` is a small Python contract for composing embodied systems without
-coupling applications to a particular robot framework or middleware. Its core remains
-dependency-free; the `grpc` extra adds a versioned local service boundary.
+<p align="center">
+  Framework-neutral contracts for embodied devices and local runtimes.
+</p>
 
-It standardizes:
+<p align="center">
+  <a href="https://github.com/pengyue-polaron/embodied-ops/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/pengyue-polaron/embodied-ops/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://pypi.org/project/embodied-ops/"><img alt="PyPI" src="https://img.shields.io/pypi/v/embodied-ops"></a>
+  <a href="https://pypi.org/project/embodied-ops/"><img alt="Python" src="https://img.shields.io/pypi/pyversions/embodied-ops"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/pypi/l/embodied-ops"></a>
+</p>
 
-- capability-oriented device manifests;
-- typed observation and action feature descriptions;
-- strict, non-clamping scalar validation;
-- lifecycle and health protocols;
-- backend discovery through the standard `embodied_ops.backends` entry-point group;
-- an optional Protobuf/gRPC transport over Unix-domain sockets.
+`embodied-ops` is a small Python interface for composing robot systems without
+coupling applications to a particular middleware or hardware framework. The
+core package has no runtime dependencies. The optional `grpc` extra adds a
+versioned process boundary over Unix-domain sockets.
 
-It intentionally does **not** own ROS nodes, robot drivers, teleoperation mappings,
-datasets, policy runtimes, process supervision, or safety limits. Those belong to
-installed backends and application runtimes.
+## Install
 
-## Backend contract
+```bash
+python -m pip install embodied-ops
+python -m pip install "embodied-ops[grpc]"
+```
 
-An integration publishes a factory in `pyproject.toml`:
+## Contracts
+
+| Area | Public contract |
+| --- | --- |
+| Description | Device manifests and typed observation/action features |
+| Capabilities | Observe, command, calibrate, reset, health, and lifecycle |
+| Validation | Strict scalar validation without implicit clamping |
+| Discovery | Standard `embodied_ops.backends` Python entry points |
+| Transport | Optional Protobuf/gRPC protocol over absolute Unix sockets |
+
+ROS nodes, drivers, teleoperation mappings, datasets, policies, safety limits,
+and process supervision stay in hardware backends or application runtimes.
+
+## Backend discovery
+
+A backend exposes one factory in `pyproject.toml`:
 
 ```toml
 [project.entry-points."embodied_ops.backends"]
 my_robot = "my_robot_runtime.backend:create_backend"
 ```
 
-The factory accepts a plain mapping and returns an `OperationalDevice`. Constructing
-the device must not open hardware; callers explicitly invoke `connect()` or use
-`device_session()`.
+The factory accepts a plain mapping and returns an `OperationalDevice`.
+Construction must not open hardware; connection remains explicit.
 
 ```python
-from embodied_ops import create_device
+from embodied_ops import device_session
 
-robot = create_device("my_robot", {"config": "robot.toml"})
-robot.connect()
-try:
-    print(robot.manifest.to_dict())
-    print(robot.health())
-finally:
-    robot.disconnect()
+with device_session("my_robot", {"config": "robot.toml"}) as device:
+    print(device.manifest.to_dict())
+    print(device.health())
 ```
 
-Additional capabilities are expressed structurally through `ObservableDevice`,
-`CommandDevice`, `CalibratableDevice`, and `ResettableDevice`. Adapters such as
-LeRobot plugins translate these contracts into their framework-native interfaces.
+Optional capabilities are represented by `ObservableDevice`, `CommandDevice`,
+`CalibratableDevice`, and `ResettableDevice`. Framework adapters translate
+these interfaces into their native Robot or Teleoperator APIs.
 
-## RPC boundary
+## Local RPC
 
-Install the optional transport when an adapter and its hardware runtime must live in
-separate processes:
-
-```bash
-python -m pip install "embodied-ops[grpc]"
-```
-
-The runtime owns the real device and serves it; clients receive only the manifest and
-capability operations:
+The Runtime owns the device and serves it; the adapter receives only the
+manifest and supported operations.
 
 ```python
 from embodied_ops.rpc import DeviceRpcServer, RemoteDevice
@@ -70,28 +77,24 @@ server = DeviceRpcServer(
 )
 server.start()
 
-robot = RemoteDevice(endpoint=endpoint, client_name="my-adapter")
-robot.connect()
+client = RemoteDevice(endpoint=endpoint, client_name="my-adapter")
+client.connect()
 ```
 
-Protocol v1 provides describe, observe, command, health, calibration, and reset RPCs.
-It carries scalar features and dependency-free typed tensor payloads. Command sessions
-are exclusive and use opaque session ids, contiguous command sequence numbers,
-monotonic timestamps, server-owned leases, and an independent command-inactivity
-deadman. Heartbeats prove session liveness but do not keep an idle command lease alive.
-Observe-only sessions may coexist. Devices that implement `CommandLeaseDevice` can
-release their command resources while keeping read-only observation attached; other
-devices retain the conservative disconnect-on-command-close behavior. The hardware
-runtime remains responsible for its final fail-closed behavior.
+Protocol v1 supports describe, observe, command, health, calibration, and reset.
+Command sessions are exclusive and carry session IDs, contiguous sequence
+numbers, monotonic timestamps, server-owned leases, and an independent command
+deadman. Heartbeats keep a session alive but do not extend an idle command
+lease. Observe-only sessions may coexist.
 
-Only absolute `unix:///` endpoints are accepted in v1. TCP/TLS policy is intentionally
-not implied by the local protocol.
+Only absolute `unix:///` endpoints are accepted. Network transport and the
+hardware Runtime's final fail-closed behavior are outside this protocol.
 
 ## Versioning
 
-The Python package follows semantic versioning. `DeviceManifest.api_version` versions
-the capability contract independently. The wire handshake has its own
-`protocol_version`; both are currently version 1.
+The package follows semantic versioning. `DeviceManifest.api_version` versions
+the capability contract; `protocol_version` versions the wire handshake. Both
+are currently version 1.
 
 ## Development
 
@@ -102,7 +105,3 @@ uv run ruff check .
 uv run ruff format --check .
 uv build
 ```
-
-## License
-
-Apache-2.0
