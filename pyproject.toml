@@ -1,6 +1,6 @@
 [project]
 name = "embodied-ops"
-version = "0.1.0"
+version = "0.2.0"
 description = "Capability-oriented protocols for embodied systems"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -19,6 +19,12 @@ classifiers = [
 ]
 dependencies = []
 
+[project.optional-dependencies]
+grpc = [
+    "grpcio>=1.82.0,<2.0.0",
+    "protobuf>=7.35.0,<8.0.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/pengyue-polaron/embodied-ops"
 Repository = "https://github.com/pengyue-polaron/embodied-ops"
@@ -31,9 +37,15 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"embodied_ops.rpc.v1" = ["*.proto"]
+
 [dependency-groups]
 dev = [
     "build>=1.2",
+    "grpcio>=1.82.0,<2.0.0",
+    "grpcio-tools>=1.82.0,<2.0.0",
+    "protobuf>=7.35.0,<8.0.0",
     "pytest>=8.3",
     "ruff>=0.11",
 ]
@@ -44,3 +56,4 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+extend-exclude = ["src/embodied_ops/rpc/v1/*_pb2*.py"]
