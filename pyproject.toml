@@ -16,6 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
 ]
 dependencies = []
 
@@ -38,6 +39,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
+embodied_ops = ["py.typed"]
 "embodied_ops.rpc.v1" = ["*.proto"]
 
 [dependency-groups]

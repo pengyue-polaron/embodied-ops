@@ -99,6 +99,7 @@ the capability contract independently. The wire handshake has its own
 uv sync --extra grpc --dev
 uv run pytest
 uv run ruff check .
+uv run ruff format --check .
 uv build
 ```
 

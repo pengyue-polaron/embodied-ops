@@ -5,13 +5,14 @@ from __future__ import annotations
 import math
 import threading
 import time
-from collections.abc import Mapping
-from typing import Any, Callable
+from collections.abc import Callable, Mapping
+from typing import Any
 
 import grpc
 
 from embodied_ops import __version__
 from embodied_ops.device import Capability, DeviceManifest, HealthReport, HealthStatus
+from embodied_ops.endpoints import unix_socket_path
 from embodied_ops.errors import ContractError, LifecycleError, RpcError
 from embodied_ops.features import validate_feature_values
 from embodied_ops.rpc._codec import (
@@ -20,7 +21,6 @@ from embodied_ops.rpc._codec import (
     values_from_proto,
     values_to_proto,
 )
-from embodied_ops.endpoints import unix_socket_path
 from embodied_ops.rpc.types import PROTOCOL_VERSION, SessionMode
 from embodied_ops.rpc.v1 import device_pb2, device_pb2_grpc
 
@@ -271,7 +271,7 @@ class RemoteDevice:
                 return
             try:
                 self._call(
-                    lambda stub: stub.Heartbeat(
+                    lambda stub, session_id=session_id: stub.Heartbeat(
                         device_pb2.SessionRequest(session_id=session_id),
                         timeout=min(self.rpc_timeout_s, interval_s),
                     ),

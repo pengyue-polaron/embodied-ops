@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import math
 import numbers
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from types import MappingProxyType
-from typing import Mapping
 
 from .errors import ContractError
 
@@ -37,7 +37,9 @@ class FeatureSpec:
             raise ContractError(f"invalid feature name: {self.name!r}")
         if not self.dtype:
             raise ContractError(f"feature {self.name!r} requires a dtype")
-        if any(not isinstance(size, int) or isinstance(size, bool) or size <= 0 for size in self.shape):
+        if any(
+            not isinstance(size, int) or isinstance(size, bool) or size <= 0 for size in self.shape
+        ):
             raise ContractError(f"feature {self.name!r} has an invalid shape: {self.shape!r}")
         if self.kind is FeatureKind.SCALAR and self.shape:
             raise ContractError(f"scalar feature {self.name!r} must have shape=()")

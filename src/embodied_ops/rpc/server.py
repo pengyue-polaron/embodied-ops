@@ -85,9 +85,7 @@ class _DeviceService(device_pb2_grpc.DeviceServiceServicer):
                 if connected_here:
                     self.device.connect()
                 try:
-                    if mode is SessionMode.COMMAND and isinstance(
-                        self.device, CommandLeaseDevice
-                    ):
+                    if mode is SessionMode.COMMAND and isinstance(self.device, CommandLeaseDevice):
                         self.device.acquire_command_lease()
                 except Exception:
                     if connected_here and not self._sessions:

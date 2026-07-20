@@ -61,6 +61,6 @@ __all__ = [
     "default_registry",
     "device_session",
     "index_features",
-    "validate_feature_values",
     "unix_socket_path",
+    "validate_feature_values",
 ]

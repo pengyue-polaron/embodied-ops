@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
-from typing import Mapping, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from .errors import ContractError
 from .features import FeatureSpec, index_features
