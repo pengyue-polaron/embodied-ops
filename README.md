@@ -5,10 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/pengyue-polaron/embodied-ops/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/pengyue-polaron/embodied-ops/actions/workflows/ci.yml/badge.svg?branch=main"></a>
-  <a href="https://pypi.org/project/embodied-ops/"><img alt="PyPI" src="https://img.shields.io/pypi/v/embodied-ops"></a>
-  <a href="https://pypi.org/project/embodied-ops/"><img alt="Python" src="https://img.shields.io/pypi/pyversions/embodied-ops"></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/pypi/l/embodied-ops"></a>
+  <a href="LICENSE"><img alt="Apache-2.0 License" src="https://img.shields.io/badge/License-Apache--2.0-blue.svg"></a>
 </p>
 
 `embodied-ops` is a small Python interface for composing robot systems without
