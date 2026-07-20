@@ -19,7 +19,6 @@ class Capability(str, Enum):
     HEALTH = "health"
     CALIBRATE = "calibrate"
     RESET = "reset"
-    CAMERA = "camera"
 
 
 class HealthStatus(str, Enum):
