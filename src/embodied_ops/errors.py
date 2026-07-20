@@ -19,3 +19,7 @@ class BackendConflictError(EmbodiedOpsError):
 
 class LifecycleError(EmbodiedOpsError, RuntimeError):
     """A device lifecycle operation is invalid or failed."""
+
+
+class RpcError(EmbodiedOpsError, RuntimeError):
+    """A versioned device RPC could not be completed."""

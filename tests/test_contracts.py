@@ -38,9 +38,7 @@ def test_manifest_and_values_are_strict_and_do_not_clamp() -> None:
     with pytest.raises(ContractError, match="above maximum"):
         validate_feature_values({"joint0.pos": 1.1}, manifest.action_features)
     with pytest.raises(ContractError, match="unknown feature"):
-        validate_feature_values(
-            {"joint0.pos": 0.0, "surprise": 1.0}, manifest.action_features
-        )
+        validate_feature_values({"joint0.pos": 0.0, "surprise": 1.0}, manifest.action_features)
 
 
 def test_manifest_rejects_ambiguous_features() -> None:

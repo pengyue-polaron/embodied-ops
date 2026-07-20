@@ -6,6 +6,7 @@ from .device import (
     CalibratableDevice,
     Capability,
     CommandDevice,
+    CommandLeaseDevice,
     DeviceManifest,
     HealthReport,
     HealthStatus,
@@ -19,7 +20,9 @@ from .errors import (
     ContractError,
     EmbodiedOpsError,
     LifecycleError,
+    RpcError,
 )
+from .endpoints import unix_socket_path
 from .features import FeatureKind, FeatureSpec, index_features, validate_feature_values
 from .registry import (
     BACKEND_ENTRY_POINT_GROUP,
@@ -40,6 +43,7 @@ __all__ = [
     "CalibratableDevice",
     "Capability",
     "CommandDevice",
+    "CommandLeaseDevice",
     "ContractError",
     "DeviceManifest",
     "EmbodiedOpsError",
@@ -51,10 +55,12 @@ __all__ = [
     "ObservableDevice",
     "OperationalDevice",
     "ResettableDevice",
+    "RpcError",
     "__version__",
     "create_device",
     "default_registry",
     "device_session",
     "index_features",
+    "unix_socket_path",
     "validate_feature_values",
 ]

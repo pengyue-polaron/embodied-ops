@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from importlib import metadata
-from typing import Callable, Iterator, Mapping
 
 from .device import OperationalDevice
 from .errors import BackendConflictError, BackendNotFoundError, ContractError
@@ -41,8 +41,12 @@ class BackendRegistry:
                 f"backend {name!r} is not installed; available backends: {list(self.names())}"
             )
         if len(matches) > 1:
-            owners = sorted(entry.dist.name if entry.dist is not None else "unknown" for entry in matches)
-            raise BackendConflictError(f"backend {name!r} is provided by multiple packages: {owners}")
+            owners = sorted(
+                entry.dist.name if entry.dist is not None else "unknown" for entry in matches
+            )
+            raise BackendConflictError(
+                f"backend {name!r} is provided by multiple packages: {owners}"
+            )
         factory = matches[0].load()
         if not callable(factory):
             raise ContractError(f"backend entry point {name!r} did not load a callable factory")

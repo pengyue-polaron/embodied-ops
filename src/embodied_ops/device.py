@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
-from typing import Mapping, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from .errors import ContractError
 from .features import FeatureSpec, index_features
@@ -19,7 +20,6 @@ class Capability(str, Enum):
     HEALTH = "health"
     CALIBRATE = "calibrate"
     RESET = "reset"
-    CAMERA = "camera"
 
 
 class HealthStatus(str, Enum):
@@ -105,6 +105,20 @@ class ObservableDevice(OperationalDevice, Protocol):
 @runtime_checkable
 class CommandDevice(OperationalDevice, Protocol):
     def command(self, action: Mapping[str, object]) -> Mapping[str, object]: ...
+
+
+@runtime_checkable
+class CommandLeaseDevice(CommandDevice, Protocol):
+    """Optional hooks for transports that grant exclusive command ownership.
+
+    Observation resources may remain connected while a transport acquires and
+    releases the command path independently. Implementations must make release
+    fail closed and idempotent.
+    """
+
+    def acquire_command_lease(self) -> None: ...
+
+    def release_command_lease(self) -> None: ...
 
 
 @runtime_checkable
