@@ -123,6 +123,12 @@ class RemoteDevice:
         if response.lease_timeout_ms <= 0:
             self._best_effort_close(response.session_id)
             raise RpcError("server returned an invalid session lease")
+        if self.mode is SessionMode.COMMAND and (
+            response.command_timeout_ms <= 0
+            or response.command_timeout_ms > response.lease_timeout_ms
+        ):
+            self._best_effort_close(response.session_id)
+            raise RpcError("server returned an invalid command inactivity timeout")
         self._session_id = response.session_id
         self._fatal_error = None
         self._next_command_sequence = 1

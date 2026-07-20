@@ -108,6 +108,20 @@ class CommandDevice(OperationalDevice, Protocol):
 
 
 @runtime_checkable
+class CommandLeaseDevice(CommandDevice, Protocol):
+    """Optional hooks for transports that grant exclusive command ownership.
+
+    Observation resources may remain connected while a transport acquires and
+    releases the command path independently. Implementations must make release
+    fail closed and idempotent.
+    """
+
+    def acquire_command_lease(self) -> None: ...
+
+    def release_command_lease(self) -> None: ...
+
+
+@runtime_checkable
 class CalibratableDevice(OperationalDevice, Protocol):
     @property
     def is_calibrated(self) -> bool: ...

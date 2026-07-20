@@ -62,7 +62,12 @@ capability operations:
 from embodied_ops.rpc import DeviceRpcServer, RemoteDevice
 
 endpoint = "unix:///run/my-robot/device.sock"
-server = DeviceRpcServer(device, endpoint=endpoint, lease_timeout_s=1.0)
+server = DeviceRpcServer(
+    device,
+    endpoint=endpoint,
+    lease_timeout_s=1.0,
+    command_timeout_s=0.5,
+)
 server.start()
 
 robot = RemoteDevice(endpoint=endpoint, client_name="my-adapter")
@@ -72,9 +77,12 @@ robot.connect()
 Protocol v1 provides describe, observe, command, health, calibration, and reset RPCs.
 It carries scalar features and dependency-free typed tensor payloads. Command sessions
 are exclusive and use opaque session ids, contiguous command sequence numbers,
-monotonic timestamps, and server-owned leases. Observe-only sessions may coexist. A
-lost command lease, command failure, or command-session close disconnects the hosted
-device; the hardware runtime remains responsible for its final fail-closed behavior.
+monotonic timestamps, server-owned leases, and an independent command-inactivity
+deadman. Heartbeats prove session liveness but do not keep an idle command lease alive.
+Observe-only sessions may coexist. Devices that implement `CommandLeaseDevice` can
+release their command resources while keeping read-only observation attached; other
+devices retain the conservative disconnect-on-command-close behavior. The hardware
+runtime remains responsible for its final fail-closed behavior.
 
 Only absolute `unix:///` endpoints are accepted in v1. TCP/TLS policy is intentionally
 not implied by the local protocol.
