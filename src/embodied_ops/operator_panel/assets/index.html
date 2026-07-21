@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="operator-panel-token" content="__PANEL_TOKEN__">
+  <title>Operator Panel</title>
+  <link rel="stylesheet" href="/panel.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p id="product-brand" class="eyebrow">OPERATOR</p>
+      <h1 id="product-title">Control</h1>
+    </div>
+    <div class="runtime-state">
+      <span id="status-dot" class="status-dot" aria-hidden="true"></span>
+      <span id="status-label">Idle</span>
+    </div>
+  </header>
+
+  <main>
+    <section id="camera-section" class="camera-section hidden" aria-label="Camera preview">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">LIVE VIEW</p>
+          <h2>Cameras</h2>
+          <p id="camera-summary" class="camera-summary" role="status">Checking camera monitor…</p>
+        </div>
+        <div class="camera-toolbar">
+          <button id="toggle-camera-grid" class="quiet" type="button" aria-controls="camera-grid" aria-expanded="true">Collapse preview</button>
+          <div id="camera-controls" class="button-row"></div>
+        </div>
+      </div>
+      <div id="camera-grid" class="camera-grid"></div>
+    </section>
+
+    <section class="workspace">
+      <nav id="workflow-tabs" class="tabs" role="tablist" aria-label="Workflow"></nav>
+
+      <div class="panel-grid">
+        <section id="control-card" class="control-card">
+          <div id="workflow-panels"></div>
+
+          <form id="configuration-panel" class="workflow-panel" role="tabpanel">
+            <p class="eyebrow">CONFIGURATIONS</p>
+            <h2>Create from a validated template</h2>
+            <label>Configuration type<select id="config-kind" required></select></label>
+            <label>Template<select id="config-template" required></select></label>
+            <label>New filename<input id="config-filename" required placeholder="my_new_config.toml"></label>
+            <div class="button-row">
+              <button id="load-template" type="button">Load template</button>
+              <button id="validate-config" type="button">Validate</button>
+            </div>
+            <label>TOML<textarea id="config-content" required spellcheck="false"></textarea></label>
+            <p class="note">Creation is atomic and create-only. Existing files are never overwritten.</p>
+            <button id="create-config" class="primary" type="submit">Create configuration</button>
+          </form>
+        </section>
+
+        <aside class="session-card">
+          <div class="section-heading compact">
+            <div>
+              <p class="eyebrow">SESSION</p>
+              <h2 id="session-name">No active workflow</h2>
+            </div>
+            <button id="stop-workflow" class="quiet danger" type="button">Stop</button>
+          </div>
+          <p id="session-state-note" class="session-state-note">Start a workflow to see its progress and available actions.</p>
+          <div id="session-progress" class="session-progress hidden" aria-live="polite"></div>
+          <div id="session-actions" class="session-actions"></div>
+          <pre id="logs" role="log" aria-live="polite" aria-relevant="additions">Panel ready.</pre>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" role="status"></div>
+  <script src="/panel.js"></script>
+</body>
+</html>

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- Add the adapter-driven Operator Panel with exclusive subprocess ownership,
+  guarded input, typed progress, create-only configuration storage, and packaged
+  Web assets.
+- Keep repository discovery, validation, hardware commands, cameras, and safety
+  behavior behind the consuming repository's adapter.
+
 ## 0.3.0
 
 - Focus the package on collection, evaluation, and artifact workflows.

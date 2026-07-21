@@ -1,7 +1,7 @@
 [project]
 name = "embodied-ops"
-version = "0.3.0"
-description = "Collection, evaluation, and artifact workflows for embodied AI"
+version = "0.4.0"
+description = "Collection, evaluation, artifact, and operator workflows for embodied AI"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
@@ -34,6 +34,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 embodied_ops = ["py.typed"]
+"embodied_ops.operator_panel" = ["README.md", "assets/*"]
 
 [dependency-groups]
 dev = [

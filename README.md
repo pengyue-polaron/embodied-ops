@@ -1,7 +1,7 @@
 <h1 align="center">embodied-ops</h1>
 
 <p align="center">
-  Reliable collection, evaluation, and artifact workflows for embodied AI.
+  Reliable collection, evaluation, artifact, and operator workflows for embodied AI.
 </p>
 
 <p align="center">
@@ -10,8 +10,9 @@
 
 `embodied-ops` contains the workflow primitives that sit above robot and policy
 adapters: episode decisions, sample-timing checks, deterministic evaluation
-plans, and transactional artifact publication. The package has no runtime
-dependencies and does not define a competing robot API.
+plans, transactional artifact publication, and an adapter-driven local Operator
+Panel. The package has no runtime dependencies and does not define a competing
+robot API.
 
 ## Install
 
@@ -26,11 +27,30 @@ python -m pip install embodied-ops
 | Collection | Portable experiment IDs, episode decisions, reset policy, sample freshness and pair skew |
 | Evaluation | Stable task/repetition plans and deterministic run slots |
 | Artifacts | Atomic file and directory publication, create-only reports, JSON helpers, and SHA-256 digests |
+| Operator Panel | Repository adapters, exclusive workflow supervision, guarded input, typed progress, and create-only configuration storage |
 
 Use the native interface of the framework that owns the hardware integration,
 such as LeRobot `Robot` and `Teleoperator`. ROS nodes, drivers, control leases,
-safety limits, datasets, policies, and process supervision remain in those
-framework or robot-specific packages.
+safety limits, datasets, policies, and hardware process lifecycles remain in
+those framework or robot-specific packages. The Operator Panel supervises only
+the adapter-provided top-level workflow command.
+
+## Operator Panel
+
+A robot repository implements `PanelAdapter` and owns every catalog value,
+validator, command, and hardware decision. The generic package serves the UI and
+runs one validated workflow at a time:
+
+```python
+from embodied_ops.operator_panel import serve_operator_panel
+
+serve_operator_panel(adapter, bind="127.0.0.1", port=8765)
+```
+
+Child processes may announce guarded input and display-only progress through
+`announce_input()` and `announce_progress()`. See
+[`src/embodied_ops/operator_panel/README.md`](src/embodied_ops/operator_panel/README.md)
+for the adapter and presentation contracts.
 
 ## Atomic artifacts
 
