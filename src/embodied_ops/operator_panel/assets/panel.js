@@ -21,6 +21,11 @@ function element(tag, attributes = {}, text = '') {
   return node;
 }
 
+function catalogList(name) {
+  const value = state.catalog?.[name];
+  return Array.isArray(value) ? value : [];
+}
+
 async function request(path, options = {}) {
   const response = await fetch(path, { cache: 'no-store', ...options });
   const payload = await response.json();
@@ -79,10 +84,11 @@ function renderProduct() {
 }
 
 function renderCameras() {
+  const cameras = catalogList('cameras');
   const section = document.getElementById('camera-section');
-  section.classList.toggle('hidden', !state.catalog.cameras.length);
+  section.classList.toggle('hidden', !cameras.length);
   const grid = document.getElementById('camera-grid');
-  grid.replaceChildren(...state.catalog.cameras.map(camera => {
+  grid.replaceChildren(...cameras.map(camera => {
     const streamUrl = cameraUrl(camera);
     const image = element('img', {
       alt: `${camera.label} camera stream`,
@@ -105,7 +111,7 @@ function renderCameras() {
     return figure;
   }));
   const controls = document.getElementById('camera-controls');
-  controls.replaceChildren(...state.catalog.camera_controls.map(control => {
+  controls.replaceChildren(...catalogList('camera_controls').map(control => {
     const classes = ['quiet', control.tone === 'danger' ? 'danger' : '']
       .filter(Boolean)
       .join(' ');
@@ -127,7 +133,7 @@ function renderCameras() {
 
 function renderCameraHealth() {
   if (!state.catalog) return;
-  const cameras = state.catalog.cameras;
+  const cameras = catalogList('cameras');
   const health = state.cameraHealth;
   let liveCount = 0;
   for (const camera of cameras) {
@@ -177,7 +183,7 @@ function formatFrameAge(ageSeconds) {
 }
 
 async function pollCameraHealth() {
-  if (!state.catalog?.cameras.length) return;
+  if (!catalogList('cameras').length) return;
   try {
     state.cameraHealth = await request('/api/camera-health');
   } catch (_error) {
@@ -269,8 +275,8 @@ function renderWorkflows() {
   panels.replaceChildren();
 
   const forms = [
-    ...state.catalog.workflows.map(item => ({ ...item, operation: 'workflow' })),
-    ...(state.catalog.registrations || []).map(item => ({
+    ...catalogList('workflows').map(item => ({ ...item, operation: 'workflow' })),
+    ...catalogList('registrations').map(item => ({
       ...item, operation: 'registration',
     })),
   ];
@@ -332,7 +338,8 @@ function renderWorkflows() {
     panels.append(form);
   }
 
-  if (state.catalog.config_types.length) {
+  const configurationTypes = catalogList('configuration_types');
+  if (configurationTypes.length) {
     const tab = element('button', {
       type: 'button',
       class: 'tab',
@@ -349,8 +356,8 @@ function renderWorkflows() {
     tab.addEventListener('click', () => activatePanel(tab.dataset.panel));
     tab.addEventListener('keydown', event => moveTabFocus(event, tabs));
   });
-  const defaultPanel = state.catalog.workflows[0]?.id
-    || (state.catalog.config_types.length ? 'configuration' : null);
+  const defaultPanel = catalogList('workflows')[0]?.id
+    || (configurationTypes.length ? 'configuration' : null);
   if (defaultPanel) activatePanel(state.activePanel || defaultPanel);
 }
 
@@ -404,19 +411,31 @@ function moveTabFocus(event, tabs) {
 
 function renderConfigurationEditor() {
   const kind = document.getElementById('config-kind');
-  kind.replaceChildren(...state.catalog.config_types.map(item => (
+  kind.replaceChildren(...catalogList('configuration_types').map(item => (
     element('option', { value: item.id }, item.label)
   )));
   updateConfigTemplates();
 }
 
-function updateConfigTemplates() {
+function selectedConfigurationType() {
   const kindId = document.getElementById('config-kind').value;
-  const definition = state.catalog.config_types.find(item => item.id === kindId);
+  return catalogList('configuration_types').find(item => item.id === kindId);
+}
+
+function updateConfigTemplates() {
+  const definition = selectedConfigurationType();
   const template = document.getElementById('config-template');
   template.replaceChildren(...(definition ? definition.templates : []).map(item => (
     element('option', { value: item.value }, item.label)
   )));
+  const extension = definition?.extension || '';
+  document.getElementById('config-filename').placeholder = `my_new_config${extension}`;
+  document.getElementById('config-content-label').textContent = (
+    definition?.language || 'Configuration'
+  );
+  document.getElementById('config-content').dataset.language = (
+    definition?.language || ''
+  ).toLowerCase();
 }
 
 async function startWorkflow(workflow, values) {
@@ -600,7 +619,12 @@ document.getElementById('load-template').addEventListener('click', async () => {
       source,
     });
     document.getElementById('config-content').value = payload.content;
-    document.getElementById('config-filename').value = `${source.split('/').pop().replace(/\.toml$/, '')}_copy.toml`;
+    const extension = selectedConfigurationType()?.extension || '';
+    const sourceName = source.split('/').pop();
+    const stem = extension && sourceName.endsWith(extension)
+      ? sourceName.slice(0, -extension.length)
+      : sourceName;
+    document.getElementById('config-filename').value = `${stem}_copy${extension}`;
     toast('Template loaded.');
   } catch (error) { toast(error.message); }
 });

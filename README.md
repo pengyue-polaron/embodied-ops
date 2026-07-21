@@ -27,7 +27,7 @@ python -m pip install embodied-ops
 | Collection | Portable experiment IDs, episode decisions, reset policy, sample freshness and pair skew |
 | Evaluation | Stable task/repetition plans and deterministic run slots |
 | Artifacts | Atomic file and directory publication, create-only reports, JSON helpers, and SHA-256 digests |
-| Operator Panel | Repository adapters, exclusive workflow supervision, guarded input, typed progress, and create-only configuration storage |
+| Operator Panel | Minimal repository adapters, optional capability providers, exclusive workflow supervision, guarded input, typed progress, and format-driven document creation |
 
 Use the native interface of the framework that owns the hardware integration,
 such as LeRobot `Robot` and `Teleoperator`. ROS nodes, drivers, control leases,
@@ -37,9 +37,10 @@ the adapter-provided top-level workflow command.
 
 ## Operator Panel
 
-A robot repository implements `PanelAdapter` and owns every catalog value,
-validator, command, and hardware decision. The generic package serves the UI and
-runs one validated workflow at a time:
+A robot repository implements the minimal `PanelAdapter` and owns every catalog
+value, command, and hardware decision. Optional camera, configuration, and
+registration providers add only the features that repository supports. The
+generic package serves the UI and runs one validated workflow at a time:
 
 ```python
 from embodied_ops.operator_panel import serve_operator_panel

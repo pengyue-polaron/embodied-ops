@@ -25,6 +25,12 @@ class OperatorPanelApplication:
         self.token = secrets.token_urlsafe(32)
         self.workflow = WorkflowProcess(Path(adapter.repo_root))
 
+    def camera_health(self) -> JsonObject:
+        provider = self.adapter.capabilities.camera
+        if provider is None:
+            raise _CapabilityUnavailable("camera")
+        return provider.camera_health()
+
     def start(self, payload: JsonObject) -> JsonObject:
         workflow = payload.get("workflow")
         values = payload.get("values", {})
@@ -33,18 +39,42 @@ class OperatorPanelApplication:
         return self.workflow.start(self.adapter.build_launch(workflow, values))
 
     def create_config(self, payload: JsonObject) -> JsonObject:
+        provider = self.adapter.capabilities.configuration
+        if provider is None:
+            raise _CapabilityUnavailable("configuration")
         if self.workflow.snapshot()["active"]:
             raise RuntimeError("cannot create a configuration while a workflow is active")
-        return self.adapter.create_config(payload)
+        result = provider.create_config(payload)
+        return {**result, "catalog": self.adapter.catalog()}
+
+    def config_template(self, payload: JsonObject) -> JsonObject:
+        provider = self.adapter.capabilities.configuration
+        if provider is None:
+            raise _CapabilityUnavailable("configuration")
+        return provider.config_template(payload)
+
+    def validate_config(self, payload: JsonObject) -> JsonObject:
+        provider = self.adapter.capabilities.configuration
+        if provider is None:
+            raise _CapabilityUnavailable("configuration")
+        return provider.validate_config(payload)
 
     def register(self, payload: JsonObject) -> JsonObject:
+        provider = self.adapter.capabilities.registration
+        if provider is None:
+            raise _CapabilityUnavailable("registration")
         if self.workflow.snapshot()["active"]:
             raise RuntimeError("cannot register repository data while a workflow is active")
         registration = payload.get("registration")
         values = payload.get("values", {})
         if not isinstance(registration, str) or not isinstance(values, dict):
             raise ValueError("register requires a registration id and values")
-        return self.adapter.register(registration, values)
+        result = provider.register(registration, values)
+        return {**result, "catalog": self.adapter.catalog()}
+
+
+class _CapabilityUnavailable(LookupError):
+    pass
 
 
 def serve_operator_panel(
@@ -110,7 +140,12 @@ def _handler_type(app: OperatorPanelApplication, asset_root: Path) -> type[BaseH
                 self._send_json(HTTPStatus.OK, app.adapter.catalog())
                 return
             if path == "/api/camera-health":
-                self._send_json(HTTPStatus.OK, app.adapter.camera_health())
+                try:
+                    payload = app.camera_health()
+                except _CapabilityUnavailable:
+                    self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
+                    return
+                self._send_json(HTTPStatus.OK, payload)
                 return
             if path == "/api/status":
                 self._send_json(HTTPStatus.OK, app.workflow.snapshot())
@@ -131,9 +166,9 @@ def _handler_type(app: OperatorPanelApplication, asset_root: Path) -> type[BaseH
                 elif path == "/api/stop":
                     result = app.workflow.stop()
                 elif path == "/api/config/template":
-                    result = app.adapter.config_template(payload)
+                    result = app.config_template(payload)
                 elif path == "/api/config/validate":
-                    result = app.adapter.validate_config(payload)
+                    result = app.validate_config(payload)
                 elif path == "/api/config/create":
                     result = app.create_config(payload)
                 elif path == "/api/register":
@@ -143,6 +178,9 @@ def _handler_type(app: OperatorPanelApplication, asset_root: Path) -> type[BaseH
                     return
             except (ValueError, FileNotFoundError, FileExistsError) as exc:
                 self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            except _CapabilityUnavailable:
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
                 return
             except RuntimeError as exc:
                 self._send_json(HTTPStatus.CONFLICT, {"error": str(exc)})

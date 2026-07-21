@@ -48,12 +48,12 @@
             <h2>Create from a validated template</h2>
             <label>Configuration type<select id="config-kind" required></select></label>
             <label>Template<select id="config-template" required></select></label>
-            <label>New filename<input id="config-filename" required placeholder="my_new_config.toml"></label>
+            <label>New filename<input id="config-filename" required placeholder="my_new_config"></label>
             <div class="button-row">
               <button id="load-template" type="button">Load template</button>
               <button id="validate-config" type="button">Validate</button>
             </div>
-            <label>TOML<textarea id="config-content" required spellcheck="false"></textarea></label>
+            <label><span id="config-content-label">Configuration</span><textarea id="config-content" required spellcheck="false"></textarea></label>
             <p class="note">Creation is atomic and create-only. Existing files are never overwritten.</p>
             <button id="create-config" class="primary" type="submit">Create configuration</button>
           </form>

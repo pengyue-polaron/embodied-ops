@@ -7,12 +7,15 @@ from pathlib import Path
 import pytest
 
 from embodied_ops.operator_panel import (
-    ConfigKind,
+    DocumentKind,
     InputAction,
     InvalidEvent,
-    RepositoryConfigStore,
+    OperatorPanelApplication,
+    PanelCapabilities,
+    RepositoryDocumentStore,
     WorkflowLaunch,
     parse_event,
+    strip_protocol_events,
 )
 from embodied_ops.operator_panel.process import WorkflowProcess
 
@@ -103,29 +106,91 @@ def test_protocol_rejects_invalid_progress() -> None:
     assert event.reason == "progress total must be positive and at least current"
 
 
-def test_repository_config_store_validates_and_creates_without_overwrite(
+def test_protocol_events_can_be_removed_without_exposing_the_wire_prefix() -> None:
+    value = 'started\n@@OPERATOR_PANEL {"progress":{"id":"inference"}}\nfinished\n'
+
+    assert strip_protocol_events(value) == "started\nfinished\n"
+
+
+def test_repository_document_store_uses_the_declared_format(
     tmp_path: Path,
 ) -> None:
     directory = tmp_path / "configs/demo"
     directory.mkdir(parents=True)
-    template = directory / "base.toml"
-    template.write_text("value = 1\n")
+    template = directory / "base.yaml"
+    template.write_text("value: 1\n")
 
     def validate(path: Path) -> None:
-        key, separator, value = path.read_text().strip().partition("=")
-        if key.strip() != "value" or separator != "=" or not value.strip().isdigit():
+        key, separator, value = path.read_text().strip().partition(":")
+        if key != "value" or separator != ":" or not value.strip().isdigit():
             raise ValueError("demo config requires one integer value")
 
-    store = RepositoryConfigStore(
+    store = RepositoryDocumentStore(
         tmp_path,
-        (ConfigKind("demo", "Demo", Path("configs/demo"), validate),),
+        (
+            DocumentKind(
+                kind_id="demo",
+                label="Demo",
+                directory=Path("configs/demo"),
+                suffix=".yaml",
+                language="YAML",
+                validate=validate,
+            ),
+        ),
     )
-    assert store.template("demo", "configs/demo/base.toml")["content"] == "value = 1\n"
-    assert store.validate("demo", "second", "value = 2")["valid"] is True
-    assert store.create("demo", "second", "value = 2") == {"created": "configs/demo/second.toml"}
-    assert (directory / "second.toml").read_text() == "value = 2\n"
+    assert store.catalog() == [
+        {
+            "id": "demo",
+            "label": "Demo",
+            "extension": ".yaml",
+            "language": "YAML",
+            "templates": [{"value": "configs/demo/base.yaml", "label": "base"}],
+        }
+    ]
+    assert store.template("demo", "configs/demo/base.yaml")["content"] == "value: 1\n"
+    assert store.validate("demo", "second", "value: 2")["valid"] is True
+    assert store.create("demo", "second", "value: 2") == {"created": "configs/demo/second.yaml"}
+    assert (directory / "second.yaml").read_text() == "value: 2\n"
     with pytest.raises(FileExistsError, match="already exists"):
-        store.create("demo", "second", "value = 3")
+        store.create("demo", "second", "value: 3")
+
+
+def test_repository_document_store_rejects_an_invalid_format(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="suffix"):
+        RepositoryDocumentStore(
+            tmp_path,
+            (
+                DocumentKind(
+                    kind_id="demo",
+                    label="Demo",
+                    directory=Path("configs/demo"),
+                    suffix="yaml",
+                    language="YAML",
+                    validate=lambda _path: None,
+                ),
+            ),
+        )
+
+
+def test_minimal_adapter_does_not_implement_optional_capabilities(tmp_path: Path) -> None:
+    class MinimalAdapter:
+        repo_root = tmp_path
+        capabilities = PanelCapabilities()
+
+        def catalog(self):
+            return {"product": {}, "workflows": []}
+
+        def build_launch(self, workflow, values):
+            raise AssertionError((workflow, values))
+
+    app = OperatorPanelApplication(MinimalAdapter())
+
+    with pytest.raises(LookupError, match="camera"):
+        app.camera_health()
+    with pytest.raises(LookupError, match="configuration"):
+        app.config_template({})
+    with pytest.raises(LookupError, match="registration"):
+        app.register({})
 
 
 def _wait_for(process: WorkflowProcess, predicate) -> dict:

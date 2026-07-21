@@ -1,4 +1,4 @@
-"""Validated, create-only repository configuration storage."""
+"""Validated, create-only repository document storage."""
 
 from __future__ import annotations
 
@@ -10,41 +10,54 @@ from pathlib import Path
 from typing import Callable
 
 
-_CONFIG_NAME = re.compile(r"[a-z][a-z0-9_-]*")
+_DOCUMENT_NAME = re.compile(r"[a-z][a-z0-9_-]*")
+_SUFFIX = re.compile(r"\.[a-z0-9]+(?:[._-][a-z0-9]+)*")
 
 
 def _include_all(_path: Path) -> bool:
     return True
 
 
-@dataclass(frozen=True)
-class ConfigKind:
+@dataclass(frozen=True, kw_only=True)
+class DocumentKind:
     kind_id: str
     label: str
     directory: Path
+    suffix: str
+    language: str
     validate: Callable[[Path], None]
     include: Callable[[Path], bool] = _include_all
 
 
-class RepositoryConfigStore:
-    def __init__(self, repo_root: Path, kinds: tuple[ConfigKind, ...]) -> None:
+class RepositoryDocumentStore:
+    def __init__(self, repo_root: Path, kinds: tuple[DocumentKind, ...]) -> None:
         self.repo_root = repo_root.resolve()
         self._kinds = {kind.kind_id: kind for kind in kinds}
         if len(self._kinds) != len(kinds):
-            raise ValueError("configuration kind ids must be unique")
+            raise ValueError("document kind ids must be unique")
         for kind in kinds:
+            if not _DOCUMENT_NAME.fullmatch(kind.kind_id):
+                raise ValueError("document kind id must be a lowercase identifier")
+            if not isinstance(kind.label, str) or not kind.label.strip():
+                raise ValueError("document kind label must be non-empty")
             if kind.directory.is_absolute() or ".." in kind.directory.parts:
-                raise ValueError("configuration directories must be repository-relative")
+                raise ValueError("document directories must be repository-relative")
+            if not isinstance(kind.suffix, str) or not _SUFFIX.fullmatch(kind.suffix):
+                raise ValueError("document suffix must be a lowercase file extension")
+            if not isinstance(kind.language, str) or not kind.language.strip():
+                raise ValueError("document language must be non-empty")
 
     def catalog(self) -> list[dict[str, object]]:
         return [
             {
                 "id": kind.kind_id,
                 "label": kind.label,
+                "extension": kind.suffix,
+                "language": kind.language,
                 "templates": [
                     {
                         "value": path.relative_to(self.repo_root).as_posix(),
-                        "label": path.stem,
+                        "label": path.name[: -len(kind.suffix)],
                     }
                     for path in self._paths(kind)
                 ],
@@ -66,7 +79,7 @@ class RepositoryConfigStore:
         kind = self._kind(kind_id)
         target = self._target(kind, filename)
         if target.exists() or target.is_symlink():
-            raise FileExistsError(f"configuration already exists: {target.name}")
+            raise FileExistsError(f"document already exists: {target.name}")
         staging = self._stage(kind, target, content)
         staging.unlink()
         return {
@@ -78,65 +91,63 @@ class RepositoryConfigStore:
         kind = self._kind(kind_id)
         target = self._target(kind, filename)
         if target.exists() or target.is_symlink():
-            raise FileExistsError(f"configuration already exists: {target.name}")
+            raise FileExistsError(f"document already exists: {target.name}")
         staging = self._stage(kind, target, content)
         try:
             os.link(staging, target)
         except FileExistsError as exc:
-            raise FileExistsError(
-                f"configuration appeared while creating it: {target.name}"
-            ) from exc
+            raise FileExistsError(f"document appeared while creating it: {target.name}") from exc
         finally:
             staging.unlink(missing_ok=True)
         return {"created": target.relative_to(self.repo_root).as_posix()}
 
-    def _kind(self, kind_id: str) -> ConfigKind:
+    def _kind(self, kind_id: str) -> DocumentKind:
         try:
             return self._kinds[kind_id]
         except KeyError as exc:
-            raise ValueError(f"unknown configuration kind: {kind_id!r}") from exc
+            raise ValueError(f"unknown document kind: {kind_id!r}") from exc
 
-    def _paths(self, kind: ConfigKind) -> list[Path]:
+    def _paths(self, kind: DocumentKind) -> list[Path]:
         directory = (self.repo_root / kind.directory).resolve()
-        return sorted(path.resolve() for path in directory.glob("*.toml") if kind.include(path))
+        return sorted(
+            path.resolve() for path in directory.glob(f"*{kind.suffix}") if kind.include(path)
+        )
 
-    def _source(self, kind: ConfigKind, source: str) -> Path:
+    def _source(self, kind: DocumentKind, source: str) -> Path:
         if not isinstance(source, str) or not source:
-            raise ValueError("configuration template path is required")
+            raise ValueError("document template path is required")
         path = (self.repo_root / source).resolve()
         directory = (self.repo_root / kind.directory).resolve()
-        if not path.is_relative_to(directory) or path.suffix != ".toml":
-            raise ValueError("template must belong to the selected configuration kind")
+        if not path.is_relative_to(directory) or not path.name.endswith(kind.suffix):
+            raise ValueError("template must belong to the selected document kind")
         if path not in self._paths(kind):
-            raise FileNotFoundError(f"configuration template is missing: {source}")
+            raise FileNotFoundError(f"document template is missing: {source}")
         return path
 
-    def _target(self, kind: ConfigKind, filename: str) -> Path:
+    def _target(self, kind: DocumentKind, filename: str) -> Path:
         if not isinstance(filename, str):
-            raise ValueError("configuration filename must be text")
-        stem = filename.removesuffix(".toml")
-        if not _CONFIG_NAME.fullmatch(stem):
+            raise ValueError("document filename must be text")
+        stem = filename.removesuffix(kind.suffix)
+        if not _DOCUMENT_NAME.fullmatch(stem):
             raise ValueError(
-                "configuration filename must start with a lowercase letter and "
+                "document filename must start with a lowercase letter and "
                 "contain only lowercase letters, digits, underscores, or hyphens"
             )
-        return (self.repo_root / kind.directory / f"{stem}.toml").resolve()
+        return (self.repo_root / kind.directory / f"{stem}{kind.suffix}").resolve()
 
-    def _stage(self, kind: ConfigKind, target: Path, content: str) -> Path:
+    def _stage(self, kind: DocumentKind, target: Path, content: str) -> Path:
         if not isinstance(content, str) or not content.strip():
-            raise ValueError("configuration content must not be empty")
+            raise ValueError("document content must not be empty")
         if "\x00" in content:
-            raise ValueError("configuration content must not contain NUL bytes")
+            raise ValueError("document content must not contain NUL bytes")
         normalized = content if content.endswith("\n") else content + "\n"
         for existing in self._paths(kind):
             if existing.read_text() == normalized:
-                raise ValueError(
-                    f"configuration content duplicates existing template: {existing.name}"
-                )
+                raise ValueError(f"document content duplicates existing template: {existing.name}")
         target.parent.mkdir(parents=True, exist_ok=True)
         descriptor, staging_name = tempfile.mkstemp(
             prefix=f".{target.stem}.candidate-",
-            suffix=".toml",
+            suffix=kind.suffix,
             dir=target.parent,
         )
         staging = Path(staging_name)

@@ -14,7 +14,7 @@ from typing import TypeAlias
 
 
 PROTOCOL_ENV = "OPERATOR_PANEL_PROTOCOL"
-PROTOCOL_PREFIX = "@@OPERATOR_PANEL "
+_PROTOCOL_PREFIX = "@@OPERATOR_PANEL "
 _PROGRESS_ID = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 _PROGRESS_MIN_INTERVAL_S = 0.25
 _progress_lock = threading.Lock()
@@ -56,7 +56,7 @@ def announce_input(actions: Iterable[str]) -> None:
         return
     normalized = _normalize_actions(actions)
     print(
-        PROTOCOL_PREFIX + json.dumps({"input": normalized}, separators=(",", ":")),
+        _PROTOCOL_PREFIX + json.dumps({"input": normalized}, separators=(",", ":")),
         flush=True,
     )
 
@@ -102,15 +102,15 @@ def announce_progress(
         if should_emit:
             _last_progress[progress_id] = (now, payload)
     if should_emit:
-        print(PROTOCOL_PREFIX + payload, flush=True)
+        print(_PROTOCOL_PREFIX + payload, flush=True)
     return True
 
 
 def parse_event(line: str) -> PanelEvent | None:
-    if not line.startswith(PROTOCOL_PREFIX):
+    if not line.startswith(_PROTOCOL_PREFIX):
         return None
     try:
-        payload = json.loads(line[len(PROTOCOL_PREFIX) :])
+        payload = json.loads(line[len(_PROTOCOL_PREFIX) :])
     except json.JSONDecodeError:
         return InvalidEvent("invalid JSON")
     if not isinstance(payload, dict):
@@ -129,6 +129,16 @@ def parse_event(line: str) -> PanelEvent | None:
         except ValueError as exc:
             return InvalidEvent(str(exc))
     return InvalidEvent("unsupported event shape")
+
+
+def strip_protocol_events(value: str) -> str:
+    """Remove machine-readable panel event lines while preserving other text."""
+
+    return "".join(
+        line
+        for line in value.splitlines(keepends=True)
+        if not line.rstrip("\r\n").startswith(_PROTOCOL_PREFIX)
+    )
 
 
 def _progress_event(value: object) -> ProgressEvent:

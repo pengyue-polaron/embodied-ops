@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- Make repository document creation format-driven instead of assuming TOML.
+- Reduce `PanelAdapter` to catalog and workflow launch responsibilities; camera,
+  configuration, and registration behavior now use independent optional providers.
+- Add public protocol-event log filtering so consumers do not depend on wire prefixes.
+- Remove the superseded configuration-store names and contracts.
+
 ## 0.4.0
 
 - Add the adapter-driven Operator Panel with exclusive subprocess ownership,
