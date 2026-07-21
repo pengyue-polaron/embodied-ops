@@ -15,6 +15,18 @@ from typing import Any
 from uuid import uuid4
 
 
+class PublishedOutputCleanupError(RuntimeError):
+    """A directory was published, but its displaced backup could not be removed."""
+
+    def __init__(self, *, target: Path, backup: Path) -> None:
+        self.target = target
+        self.backup = backup
+        super().__init__(
+            f"published output at {target}, but failed to remove backup {backup}; "
+            "the published target is authoritative and the backup must be inspected"
+        )
+
+
 def _absolute_path(path: Path) -> Path:
     """Make a path absolute without following its final symlink."""
 
@@ -79,6 +91,12 @@ class OutputDirectoryTransaction:
         self.path: Path | None = None
         self._committed = False
 
+    @property
+    def committed(self) -> bool:
+        """Whether the staged directory has already become the target."""
+
+        return self._committed
+
     def __enter__(self) -> OutputDirectoryTransaction:
         if self.path is not None:
             raise RuntimeError("output transaction instances cannot be reused")
@@ -111,8 +129,20 @@ class OutputDirectoryTransaction:
             raise RuntimeError(f"staged directory was not created: {self.path}") from exc
         if not stat.S_ISDIR(staged_mode):
             raise RuntimeError(f"staged output is not a real directory: {self.path}")
-        _install_staged_directory(self.path, self.target, overwrite=self.overwrite)
+        backup = _install_staged_directory(
+            self.path,
+            self.target,
+            overwrite=self.overwrite,
+        )
         self._committed = True
+        if backup is not None:
+            try:
+                _remove(backup)
+            except OSError as exc:
+                raise PublishedOutputCleanupError(
+                    target=self.target,
+                    backup=backup,
+                ) from exc
         return self.target
 
     def __exit__(self, exc_type, exc, traceback) -> None:
@@ -140,10 +170,15 @@ def atomic_output_directory(
         transaction.commit()
 
 
-def _install_staged_directory(staging: Path, target: Path, *, overwrite: bool) -> None:
+def _install_staged_directory(
+    staging: Path,
+    target: Path,
+    *,
+    overwrite: bool,
+) -> Path | None:
     if not _exists(target):
         os.replace(staging, target)
-        return
+        return None
     if not overwrite:
         raise FileExistsError(f"target root appeared during publication: {target}")
 
@@ -159,7 +194,7 @@ def _install_staged_directory(staging: Path, target: Path, *, overwrite: bool) -
                 f"failed to install {target} and failed to restore backup {backup}"
             ) from restore_error
         raise
-    _remove(backup)
+    return backup
 
 
 @contextmanager

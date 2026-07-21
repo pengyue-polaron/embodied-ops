@@ -38,15 +38,17 @@ framework or robot-specific packages.
 from pathlib import Path
 from embodied_ops import OutputDirectoryTransaction
 
-with OutputDirectoryTransaction(Path("runs/eval-001")) as output:
-    assert output.path is not None
-    (output.path / "metrics.json").write_text("{}\n")
-    output.commit()
+with OutputDirectoryTransaction(Path("runs/eval-001")) as transaction:
+    assert transaction.path is not None
+    (transaction.path / "metrics.json").write_text("{}\n")
+    transaction.commit()
 ```
 
 If the body fails or exits without `commit()`, the staging directory is removed
-and any previous complete output remains authoritative. Unfinished staging or
-backup siblings block reuse until they are inspected. For single files,
+and any previous complete output remains authoritative. Once publication succeeds,
+`transaction.committed` remains true even if removal of the displaced backup fails;
+that recovery state raises `PublishedOutputCleanupError` with both paths. Unfinished
+staging or backup siblings block reuse until they are inspected. For single files,
 `create_only_output_file()` provides the same build-then-publish flow without
 ever replacing an existing path.
 

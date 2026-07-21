@@ -56,11 +56,13 @@ def normalize_episode_decision(text: str | None) -> EpisodeDecision:
     """Map the conventional interactive collection commands to one decision."""
 
     value = (text or "").strip().lower()
+    if value in {"", "s", "save"}:
+        return EpisodeDecision.SAVE
     if value in {"d", "discard"}:
         return EpisodeDecision.DISCARD
     if value in {"q", "quit", "exit"}:
         return EpisodeDecision.QUIT
-    return EpisodeDecision.SAVE
+    raise ValueError(f"unknown episode decision: {text!r}")
 
 
 class TimedSample(Protocol):

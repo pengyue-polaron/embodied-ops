@@ -3,6 +3,7 @@
 from ._version import __version__
 from .artifacts import (
     OutputDirectoryTransaction,
+    PublishedOutputCleanupError,
     atomic_output_directory,
     atomic_output_file,
     atomic_write_json,
@@ -34,6 +35,7 @@ __all__ = [
     "EvaluationPlan",
     "EvaluationSlot",
     "OutputDirectoryTransaction",
+    "PublishedOutputCleanupError",
     "TimedSample",
     "__version__",
     "atomic_output_directory",

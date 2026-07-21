@@ -57,6 +57,7 @@ class EvaluationSlot:
     def to_dict(self) -> dict[str, int | str]:
         return {
             "id": self.plan_id,
+            "task_id": self.task_id,
             "task_position": self.task_position,
             "task_count": self.task_count,
             "attempt": self.attempt,

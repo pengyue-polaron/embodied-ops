@@ -8,6 +8,7 @@ from embodied_ops import (
     EpisodeDecision,
     EvaluationPlan,
     OutputDirectoryTransaction,
+    PublishedOutputCleanupError,
     atomic_output_directory,
     atomic_output_file,
     create_only_output_file,
@@ -60,6 +61,36 @@ def test_directory_transaction_can_defer_staging_creation(tmp_path) -> None:
         transaction.commit()
 
     assert (target / "complete.txt").read_text() == "ready"
+
+
+def test_directory_transaction_reports_cleanup_failure_as_published(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import embodied_ops.artifacts as artifacts
+
+    target = tmp_path / "dataset"
+    target.mkdir()
+    (target / "old.txt").write_text("old")
+    original_remove = artifacts._remove
+
+    def fail_backup_cleanup(path):
+        if ".backup-" in path.name:
+            raise PermissionError("injected backup cleanup failure")
+        original_remove(path)
+
+    monkeypatch.setattr(artifacts, "_remove", fail_backup_cleanup)
+    with OutputDirectoryTransaction(target, overwrite=True) as transaction:
+        assert transaction.path is not None
+        (transaction.path / "new.txt").write_text("new")
+        with pytest.raises(PublishedOutputCleanupError, match="published output") as error:
+            transaction.commit()
+        assert transaction.committed is True
+
+    assert error.value.target == target
+    assert (target / "new.txt").read_text() == "new"
+    assert not (target / "old.txt").exists()
+    assert (error.value.backup / "old.txt").read_text() == "old"
 
 
 def test_directory_transaction_rejects_symlink_staging_and_crash_leftovers(
@@ -123,8 +154,11 @@ def test_collection_identity_and_episode_decisions_are_portable() -> None:
         validate_experiment_name("../escape")
 
     assert normalize_episode_decision("") is EpisodeDecision.SAVE
+    assert normalize_episode_decision("save") is EpisodeDecision.SAVE
     assert normalize_episode_decision("discard") is EpisodeDecision.DISCARD
     assert normalize_episode_decision("q") is EpisodeDecision.QUIT
+    with pytest.raises(ValueError, match="unknown episode decision"):
+        normalize_episode_decision("dscard")
     assert reset_required_after_episode(
         EpisodeDecision.DISCARD,
         after_save=False,
@@ -193,6 +227,7 @@ def test_evaluation_plan_assigns_stable_slots() -> None:
     assert slots[4].task_id == "lemon_bowl"
     assert slots[4].to_dict() == {
         "id": "fruit-placement",
+        "task_id": "lemon_bowl",
         "task_position": 2,
         "task_count": 2,
         "attempt": 2,
