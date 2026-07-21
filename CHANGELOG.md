@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0
+
+- Focus the package on collection, evaluation, and artifact workflows.
+- Add transactional directory/file publication and create-only report helpers.
+- Add portable episode decisions, sample freshness/skew checks, and deterministic
+  evaluation plans.
+- Remove the experimental generic device capability, backend discovery, and RPC APIs.
+  Hardware integrations should use their framework-native interfaces and keep
+  transport details robot-specific.
+
 ## 0.2.0
 
 - Add a versioned Protobuf/gRPC device protocol over absolute Unix sockets.

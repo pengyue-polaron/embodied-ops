@@ -1,7 +1,8 @@
 # Security
 
-Do not report credentials, device keys, or live-control details in a public issue.
-Use GitHub's private vulnerability reporting for security-sensitive findings.
+Do not report credentials, private dataset contents, or unpublished evaluation
+artifacts in a public issue. Use GitHub's private vulnerability reporting for
+security-sensitive findings.
 
-Backends control real devices. They must validate configuration before opening
-hardware and must fail closed on malformed, stale, or non-finite commands.
+Artifact transactions protect publication, not access control. Applications remain
+responsible for permissions, retention, and remote-storage security.

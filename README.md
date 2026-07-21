@@ -1,102 +1,76 @@
 <h1 align="center">embodied-ops</h1>
 
 <p align="center">
-  Framework-neutral contracts for embodied devices and local runtimes.
+  Reliable collection, evaluation, and artifact workflows for embodied AI.
 </p>
 
 <p align="center">
   <a href="LICENSE"><img alt="Apache-2.0 License" src="https://img.shields.io/badge/License-Apache--2.0-blue.svg"></a>
 </p>
 
-`embodied-ops` is a small Python interface for composing robot systems without
-coupling applications to a particular middleware or hardware framework. The
-core package has no runtime dependencies. The optional `grpc` extra adds a
-versioned process boundary over Unix-domain sockets.
+`embodied-ops` contains the workflow primitives that sit above robot and policy
+adapters: episode decisions, sample-timing checks, deterministic evaluation
+plans, and transactional artifact publication. The package has no runtime
+dependencies and does not define a competing robot API.
 
 ## Install
 
 ```bash
 python -m pip install embodied-ops
-python -m pip install "embodied-ops[grpc]"
 ```
 
-## Contracts
+## Scope
 
 | Area | Public contract |
 | --- | --- |
-| Description | Device manifests and typed observation/action features |
-| Capabilities | Observe, command, calibrate, reset, health, and lifecycle |
-| Validation | Strict scalar validation without implicit clamping |
-| Discovery | Standard `embodied_ops.backends` Python entry points |
-| Transport | Optional Protobuf/gRPC protocol over absolute Unix sockets |
+| Collection | Portable experiment IDs, episode decisions, reset policy, sample freshness and pair skew |
+| Evaluation | Stable task/repetition plans and deterministic run slots |
+| Artifacts | Atomic file and directory publication, create-only reports, JSON helpers, and SHA-256 digests |
 
-ROS nodes, drivers, teleoperation mappings, datasets, policies, safety limits,
-and process supervision stay in hardware backends or application runtimes.
+Use the native interface of the framework that owns the hardware integration,
+such as LeRobot `Robot` and `Teleoperator`. ROS nodes, drivers, control leases,
+safety limits, datasets, policies, and process supervision remain in those
+framework or robot-specific packages.
 
-## Backend discovery
-
-A backend exposes one factory in `pyproject.toml`:
-
-```toml
-[project.entry-points."embodied_ops.backends"]
-my_robot = "my_robot_runtime.backend:create_backend"
-```
-
-The factory accepts a plain mapping and returns an `OperationalDevice`.
-Construction must not open hardware; connection remains explicit.
+## Atomic artifacts
 
 ```python
-from embodied_ops import device_session
+from pathlib import Path
+from embodied_ops import OutputDirectoryTransaction
 
-with device_session("my_robot", {"config": "robot.toml"}) as device:
-    print(device.manifest.to_dict())
-    print(device.health())
+with OutputDirectoryTransaction(Path("runs/eval-001")) as output:
+    assert output.path is not None
+    (output.path / "metrics.json").write_text("{}\n")
+    output.commit()
 ```
 
-Optional capabilities are represented by `ObservableDevice`, `CommandDevice`,
-`CalibratableDevice`, and `ResettableDevice`. Framework adapters translate
-these interfaces into their native Robot or Teleoperator APIs.
+If the body fails or exits without `commit()`, the staging directory is removed
+and any previous complete output remains authoritative. Unfinished staging or
+backup siblings block reuse until they are inspected. For single files,
+`create_only_output_file()` provides the same build-then-publish flow without
+ever replacing an existing path.
 
-## Local RPC
-
-The Runtime owns the device and serves it; the adapter receives only the
-manifest and supported operations.
+## Evaluation plans
 
 ```python
-from embodied_ops.rpc import DeviceRpcServer, RemoteDevice
+from embodied_ops import EvaluationPlan
 
-endpoint = "unix:///run/my-robot/device.sock"
-server = DeviceRpcServer(
-    device,
-    endpoint=endpoint,
-    lease_timeout_s=1.0,
-    command_timeout_s=0.5,
+plan = EvaluationPlan(
+    identifier="fruit-placement",
+    task_ids=("apple_bowl", "mango_plate"),
+    attempts_per_task=3,
 )
-server.start()
-
-client = RemoteDevice(endpoint=endpoint, client_name="my-adapter")
-client.connect()
+for slot in plan.slots():
+    print(slot.sequence, slot.total, slot.task_id)
 ```
 
-Protocol v1 supports describe, observe, command, health, calibration, and reset.
-Command sessions are exclusive and carry session IDs, contiguous sequence
-numbers, monotonic timestamps, server-owned leases, and an independent command
-deadman. Heartbeats keep a session alive but do not extend an idle command
-lease. Observe-only sessions may coexist.
-
-Only absolute `unix:///` endpoints are accepted. Network transport and the
-hardware Runtime's final fail-closed behavior are outside this protocol.
-
-## Versioning
-
-The package follows semantic versioning. `DeviceManifest.api_version` versions
-the capability contract; `protocol_version` versions the wire handshake. Both
-are currently version 1.
+Run metadata may persist `slot.to_dict()` and later reconstruct the same
+task/repetition position without depending on directory order.
 
 ## Development
 
 ```bash
-uv sync --extra grpc --dev
+uv sync --dev
 uv run pytest
 uv run ruff check .
 uv run ruff format --check .
