@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.1
+
+- Add a strict create-only JSON task and prompt registry.
+- Add normalized local camera-health contracts for Operator Panel adapters.
+
 ## 0.5.0
 
 - Make repository document creation format-driven instead of assuming TOML.
