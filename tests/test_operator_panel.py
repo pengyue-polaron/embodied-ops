@@ -14,6 +14,8 @@ from embodied_ops.operator_panel import (
     PanelCapabilities,
     RepositoryDocumentStore,
     WorkflowLaunch,
+    normalize_camera_health,
+    unavailable_camera_health,
     parse_event,
     strip_protocol_events,
 )
@@ -191,6 +193,56 @@ def test_minimal_adapter_does_not_implement_optional_capabilities(tmp_path: Path
         app.config_template({})
     with pytest.raises(LookupError, match="registration"):
         app.register({})
+
+
+def test_camera_health_contract_is_normalized() -> None:
+    assert normalize_camera_health(
+        {
+            "ok": True,
+            "streams": {
+                "wrist": {
+                    "ready": True,
+                    "fresh": True,
+                    "preview_fps": 9,
+                    "age_s": 0.03,
+                    "error": None,
+                }
+            },
+        }
+    ) == {
+        "available": True,
+        "ok": True,
+        "streams": {
+            "wrist": {
+                "ready": True,
+                "fresh": True,
+                "preview_fps": 9.0,
+                "age_s": 0.03,
+                "error": None,
+            }
+        },
+    }
+    assert unavailable_camera_health("not running") == {
+        "available": False,
+        "ok": False,
+        "streams": {},
+        "reason": "not running",
+    }
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        normalize_camera_health(
+            {
+                "ok": False,
+                "streams": {
+                    "wrist": {
+                        "ready": True,
+                        "fresh": False,
+                        "preview_fps": float("nan"),
+                        "age_s": None,
+                        "error": None,
+                    }
+                },
+            }
+        )
 
 
 def _wait_for(process: WorkflowProcess, predicate) -> dict:

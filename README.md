@@ -25,9 +25,10 @@ python -m pip install embodied-ops
 | Area | Public contract |
 | --- | --- |
 | Collection | Portable experiment IDs, episode decisions, reset policy, sample freshness and pair skew |
+| Tasks | Strict create-only JSON prompt catalogs shared by collection and evaluation adapters |
 | Evaluation | Stable task/repetition plans and deterministic run slots |
 | Artifacts | Atomic file and directory publication, create-only reports, JSON helpers, and SHA-256 digests |
-| Operator Panel | Minimal repository adapters, optional capability providers, exclusive workflow supervision, guarded input, typed progress, and format-driven document creation |
+| Operator Panel | Minimal repository adapters, normalized camera health, optional capability providers, exclusive workflow supervision, guarded input, typed progress, and format-driven document creation |
 
 Use the native interface of the framework that owns the hardware integration,
 such as LeRobot `Robot` and `Teleoperator`. ROS nodes, drivers, control leases,

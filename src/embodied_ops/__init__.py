@@ -29,6 +29,13 @@ from .evaluation import (
     EvaluationSlot,
     validate_identifier,
 )
+from .task_registry import (
+    TaskCatalog,
+    TaskDistribution,
+    TaskPrompt,
+    load_task_catalog,
+    register_task_prompt,
+)
 
 __all__ = [
     "EpisodeDecision",
@@ -37,6 +44,9 @@ __all__ = [
     "OutputDirectoryTransaction",
     "PublishedOutputCleanupError",
     "TimedSample",
+    "TaskCatalog",
+    "TaskDistribution",
+    "TaskPrompt",
     "__version__",
     "atomic_output_directory",
     "atomic_output_file",
@@ -44,9 +54,11 @@ __all__ = [
     "atomic_write_text",
     "create_only_output_file",
     "file_sha256",
+    "load_task_catalog",
     "normalize_episode_decision",
     "read_json_object",
     "read_jsonl_objects",
+    "register_task_prompt",
     "require_fresh_sample",
     "require_pair_skew",
     "reset_required_after_episode",

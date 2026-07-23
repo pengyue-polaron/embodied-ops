@@ -9,6 +9,11 @@ from .contracts import (
     RegistrationProvider,
     WorkflowLaunch,
 )
+from .camera_health import (
+    fetch_camera_health,
+    normalize_camera_health,
+    unavailable_camera_health,
+)
 from .document_store import DocumentKind, RepositoryDocumentStore
 from .protocol import (
     InvalidEvent,
@@ -35,7 +40,10 @@ __all__ = [
     "WorkflowLaunch",
     "announce_input",
     "announce_progress",
+    "fetch_camera_health",
+    "normalize_camera_health",
     "parse_event",
     "serve_operator_panel",
     "strip_protocol_events",
+    "unavailable_camera_health",
 ]

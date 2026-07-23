@@ -16,6 +16,8 @@ from embodied_ops import (
     require_fresh_sample,
     require_pair_skew,
     reset_required_after_episode,
+    load_task_catalog,
+    register_task_prompt,
     validate_experiment_name,
     write_json_once,
 )
@@ -164,6 +166,75 @@ def test_collection_identity_and_episode_decisions_are_portable() -> None:
         after_save=False,
         after_discard=True,
     )
+
+
+def test_task_registry_loads_in_order_and_registers_create_only(tmp_path) -> None:
+    root = tmp_path
+    directory = root / "configs/tasks/fruit"
+    prompts = directory / "prompts"
+    prompts.mkdir(parents=True)
+    (directory / "catalog.json").write_text('{"schema_version":1,"id":"fruit-placement"}\n')
+    (prompts / "banana_bowl.json").write_text(
+        '{"schema_version":1,"order":20,"id":"banana_bowl",'
+        '"prompt":"put the banana in the bowl","distribution":"train"}\n'
+    )
+    (prompts / "apple_bowl.json").write_text(
+        '{"schema_version":1,"order":10,"id":"apple_bowl",'
+        '"prompt":"put the apple in the bowl","distribution":"ood"}\n'
+    )
+
+    catalog = load_task_catalog(directory / "catalog.json", repo_root=root)
+
+    assert catalog.catalog_id == "fruit-placement"
+    assert [task.task_id for task in catalog.tasks] == ["apple_bowl", "banana_bowl"]
+    assert catalog.default.task_id == "apple_bowl"
+    assert catalog.task("banana_bowl").distribution == "train"
+    created = register_task_prompt(
+        directory / "catalog.json",
+        task_id="pear_bowl",
+        prompt="put the pear in the bowl",
+        distribution="ood",
+        repo_root=root,
+    )
+    assert created.name == "pear_bowl.json"
+    assert (
+        load_task_catalog(directory / "catalog.json", repo_root=root).task("pear_bowl").prompt
+        == "put the pear in the bowl"
+    )
+    with pytest.raises(FileExistsError, match="already registered"):
+        register_task_prompt(
+            directory / "catalog.json",
+            task_id="pear_bowl",
+            prompt="another prompt",
+            distribution="ood",
+            repo_root=root,
+        )
+
+
+def test_task_registry_rejects_paths_and_duplicate_prompt_text(tmp_path) -> None:
+    root = tmp_path
+    directory = root / "configs/tasks/fruit"
+    prompts = directory / "prompts"
+    prompts.mkdir(parents=True)
+    catalog_path = directory / "catalog.json"
+    catalog_path.write_text('{"schema_version":1,"id":"fruit"}\n')
+    (prompts / "apple.json").write_text(
+        '{"schema_version":1,"order":10,"id":"apple",'
+        '"prompt":"pick the apple","distribution":"train"}\n'
+    )
+    outside = root / "catalog.json"
+    outside.write_text('{"schema_version":1,"id":"outside"}\n')
+
+    with pytest.raises(ValueError, match="under configs/tasks"):
+        load_task_catalog(outside, repo_root=root)
+    with pytest.raises(ValueError, match="already registered"):
+        register_task_prompt(
+            catalog_path,
+            task_id="other",
+            prompt="pick the apple",
+            distribution="ood",
+            repo_root=root,
+        )
 
 
 @dataclass(frozen=True)
