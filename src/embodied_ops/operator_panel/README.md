@@ -29,6 +29,10 @@ stays read-only: the camera provider supplies normalized freshness, frame-age,
 preview-rate, and error status without giving the panel direct access to a
 device.
 
+Workflow fields may use `type: "combobox"` with catalog-provided `options` when
+an operator should be able to select an existing value or type a new one. The
+submitted value remains plain text and is validated by the consuming adapter.
+
 The terminal has its own bounded scroll area. It follows appended output only
 while the viewer is already at the bottom, preserving their position while they
 inspect older lines. Ordinary `[RUN]` status lines are similarly transient; the

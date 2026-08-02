@@ -197,7 +197,7 @@ async function pollCameraHealth() {
   renderCameraHealth();
 }
 
-function fieldControl(field) {
+function fieldControl(field, namespace) {
   if (field.type === 'checkbox') {
     const input = element('input', { type: 'checkbox', name: field.name });
     input.checked = Boolean(field.default);
@@ -206,7 +206,9 @@ function fieldControl(field) {
     return label;
   }
 
+  const fieldToken = `${namespace}-${field.name}`.replace(/[^a-zA-Z0-9_-]/g, '-');
   let control;
+  let optionList = null;
   if (field.type === 'select') {
     control = element('select', { name: field.name, required: field.required !== false });
   } else {
@@ -217,28 +219,50 @@ function fieldControl(field) {
       placeholder: field.placeholder || '',
       value: field.default || '',
     });
+    if (field.type === 'combobox') {
+      const listId = `options-${fieldToken}`;
+      control.setAttribute('list', listId);
+      optionList = element('datalist', { id: listId });
+    }
   }
   const label = element('label', {}, field.label);
   label.append(control);
+  if (optionList) label.append(optionList);
+  if (field.help_text) {
+    const helpId = `help-${fieldToken}`;
+    control.setAttribute('aria-describedby', helpId);
+    label.append(element('span', { class: 'field-help', id: helpId }, field.help_text));
+  }
   return label;
 }
 
 function updateSelects(form, workflow) {
-  for (const field of workflow.fields.filter(item => item.type === 'select')) {
-    const select = form.elements.namedItem(field.name);
-    const previous = select.value || field.default || '';
+  const optionFields = workflow.fields.filter(
+    item => item.type === 'select' || item.type === 'combobox',
+  );
+  for (const field of optionFields) {
+    const control = form.elements.namedItem(field.name);
+    const previous = control.value || field.default || '';
     const dependency = field.depends_on
       ? form.elements.namedItem(field.depends_on).value
       : null;
     const options = field.options.filter(item => (
       !field.depends_on || item.depends_value === dependency
     ));
-    select.replaceChildren(...options.map(item => element('option', {
+    if (field.type === 'combobox') {
+      const optionList = control.closest('label').querySelector('datalist');
+      optionList.replaceChildren(...options.map(item => element('option', {
+        value: item.value,
+        label: item.label,
+      })));
+      continue;
+    }
+    control.replaceChildren(...options.map(item => element('option', {
       value: item.value,
       selected: item.value === previous,
     }, item.label)));
-    if (![...select.options].some(item => item.value === select.value) && select.options.length) {
-      select.selectedIndex = 0;
+    if (![...control.options].some(item => item.value === control.value) && control.options.length) {
+      control.selectedIndex = 0;
     }
   }
 }
@@ -307,7 +331,7 @@ function renderWorkflows() {
     );
     form.append(
       heading,
-      ...workflow.fields.map(fieldControl),
+      ...workflow.fields.map(field => fieldControl(field, workflow.id)),
     );
     configureDerivedFields(form, workflow);
     const submitClasses = ['primary', workflow.tone === 'danger' ? 'danger' : '']
@@ -319,8 +343,8 @@ function renderWorkflows() {
     }, workflow.submit_label);
     submit.dataset.panelAction = workflow.id;
     form.append(submit);
-    form.querySelectorAll('select').forEach(select => {
-      select.addEventListener('change', () => updateSelects(form, workflow));
+    form.querySelectorAll('select, input[list]').forEach(control => {
+      control.addEventListener('change', () => updateSelects(form, workflow));
     });
     updateSelects(form, workflow);
     form.addEventListener('submit', async event => {

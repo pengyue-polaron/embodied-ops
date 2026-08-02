@@ -122,6 +122,7 @@ figcaption { position: absolute; right: 7px; bottom: 7px; left: 7px; display: fl
 
 label { display: grid; gap: 4px; font-size: 11px; font-weight: 650; }
 input, select, textarea { width: 100%; min-height: 38px; padding: 0 9px; border: 1px solid var(--line); border-radius: 0; color: var(--black); background: var(--white); }
+.field-help { color: var(--muted); font-size: 10px; font-weight: 400; line-height: 1.4; }
 textarea { min-height: 210px; padding: 9px; resize: vertical; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; tab-size: 2; }
 input:focus, select:focus, textarea:focus { border-color: var(--black); outline: 1px solid var(--black); }
 .check { grid-template-columns: auto 1fr; align-items: center; font-weight: 500; }
