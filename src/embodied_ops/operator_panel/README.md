@@ -9,6 +9,11 @@ imports.
 A consuming repository implements `PanelAdapter` to provide its catalog,
 capabilities, and argv-only workflow launches. The base adapter requires only
 `repo_root`, `catalog()`, `build_launch()`, and a `PanelCapabilities` value.
+Every catalog uses `schema_version: 1` and is validated against the exact public
+top-level, workflow, field, camera, and configuration-group contract before the
+server starts and before it is returned. The public `option()`, `select_field()`,
+`text_field()`, `combobox_field()`, and `checkbox_field()` builders keep forms
+structurally consistent while adapters retain robot-specific values.
 Camera health, configuration documents, and structured registration are
 independent providers and may be absent. Child processes call
 `embodied_ops.operator_panel.announce_input()` immediately before an interactive

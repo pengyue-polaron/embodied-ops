@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0
+
+- Standardize dependency-free CLI levels, status presentation, task selection,
+  and collection Start/Save, Discard, and Quit interaction across robots.
+- Add a strict versioned Operator Panel catalog schema and reusable form builders
+  so adapters provide robot-specific values without redefining the Web contract.
+- Add reusable evaluation progress, contract-digest, verified Hugging Face
+  artifact-store, and pinned code-environment workflows.
+- Require every Operator Panel adapter catalog to satisfy schema version 1.
+
 ## 0.5.1
 
 - Add a strict create-only JSON task and prompt registry.

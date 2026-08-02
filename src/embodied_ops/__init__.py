@@ -1,4 +1,4 @@
-"""Public collection, evaluation, and artifact workflow contracts."""
+"""Public operator-workflow contracts for embodied systems."""
 
 from ._version import __version__
 from .artifacts import (
@@ -15,18 +15,37 @@ from .artifacts import (
     write_json_once,
     write_text_once,
 )
+from .artifact_store import (
+    ArtifactValidation,
+    fetch_huggingface_artifact,
+    validate_artifact,
+)
 from .collection import (
+    CollectionInteraction,
     EpisodeDecision,
+    STANDARD_COLLECTION_INTERACTION,
     TimedSample,
+    normalize_collection_start,
     normalize_episode_decision,
     require_fresh_sample,
     require_pair_skew,
     reset_required_after_episode,
     validate_experiment_name,
 )
+from .code_environment import (
+    ensure_code_checkout,
+    ensure_code_environment,
+    verify_code_checkout,
+    verify_code_environment,
+    verify_environment_lock,
+)
+from .contracts import add_contract_digest, validate_exact_metadata
+from .task_selection import TaskSelectionCancelled, select_task
 from .evaluation import (
     EvaluationPlan,
+    EvaluationProgress,
     EvaluationSlot,
+    summarize_evaluation_progress,
     validate_identifier,
 )
 from .task_registry import (
@@ -38,23 +57,33 @@ from .task_registry import (
 )
 
 __all__ = [
+    "ArtifactValidation",
+    "CollectionInteraction",
     "EpisodeDecision",
     "EvaluationPlan",
+    "EvaluationProgress",
     "EvaluationSlot",
     "OutputDirectoryTransaction",
     "PublishedOutputCleanupError",
+    "STANDARD_COLLECTION_INTERACTION",
     "TimedSample",
     "TaskCatalog",
     "TaskDistribution",
     "TaskPrompt",
+    "TaskSelectionCancelled",
     "__version__",
+    "add_contract_digest",
     "atomic_output_directory",
     "atomic_output_file",
     "atomic_write_json",
     "atomic_write_text",
     "create_only_output_file",
+    "ensure_code_checkout",
+    "ensure_code_environment",
     "file_sha256",
+    "fetch_huggingface_artifact",
     "load_task_catalog",
+    "normalize_collection_start",
     "normalize_episode_decision",
     "read_json_object",
     "read_jsonl_objects",
@@ -62,8 +91,15 @@ __all__ = [
     "require_fresh_sample",
     "require_pair_skew",
     "reset_required_after_episode",
+    "select_task",
+    "summarize_evaluation_progress",
     "validate_experiment_name",
     "validate_identifier",
+    "validate_exact_metadata",
+    "validate_artifact",
+    "verify_code_checkout",
+    "verify_code_environment",
+    "verify_environment_lock",
     "write_json_once",
     "write_text_once",
 ]

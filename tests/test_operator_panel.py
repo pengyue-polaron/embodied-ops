@@ -11,13 +11,17 @@ from embodied_ops.operator_panel import (
     InputAction,
     InvalidEvent,
     OperatorPanelApplication,
+    PANEL_CATALOG_SCHEMA_VERSION,
     PanelCapabilities,
     RepositoryDocumentStore,
     WorkflowLaunch,
+    select_field,
+    text_field,
     normalize_camera_health,
     unavailable_camera_health,
     parse_event,
     strip_protocol_events,
+    validate_panel_catalog,
 )
 from embodied_ops.operator_panel.process import WorkflowProcess
 
@@ -180,7 +184,7 @@ def test_minimal_adapter_does_not_implement_optional_capabilities(tmp_path: Path
         capabilities = PanelCapabilities()
 
         def catalog(self):
-            return {"product": {}, "workflows": []}
+            return _minimal_catalog()
 
         def build_launch(self, workflow, values):
             raise AssertionError((workflow, values))
@@ -193,6 +197,32 @@ def test_minimal_adapter_does_not_implement_optional_capabilities(tmp_path: Path
         app.config_template({})
     with pytest.raises(LookupError, match="registration"):
         app.register({})
+
+
+def test_panel_catalog_schema_standardizes_product_workflows_and_fields() -> None:
+    catalog = _minimal_catalog()
+    catalog["workflows"] = [
+        {
+            "id": "collect",
+            "label": "Collect",
+            "eyebrow": "DATA COLLECTION",
+            "title": "Collect episodes",
+            "submit_label": "Start collection",
+            "fields": [
+                select_field(
+                    "robot",
+                    "Robot",
+                    [{"value": "demo", "label": "Demo robot"}],
+                ),
+                text_field("task", "Task", placeholder="pick the object"),
+            ],
+        }
+    ]
+
+    assert validate_panel_catalog(catalog) is catalog
+    catalog["workflows"][0]["fields"][0]["unknown"] = True
+    with pytest.raises(ValueError, match="invalid keys"):
+        validate_panel_catalog(catalog)
 
 
 def test_camera_health_contract_is_normalized() -> None:
@@ -252,3 +282,16 @@ def _wait_for(process: WorkflowProcess, predicate) -> dict:
         time.sleep(0.01)
         status = process.snapshot()
     return status
+
+
+def _minimal_catalog() -> dict:
+    return {
+        "schema_version": PANEL_CATALOG_SCHEMA_VERSION,
+        "product": {"brand": "DEMO", "title": "Control"},
+        "cameras": [],
+        "camera_controls": [],
+        "workflows": [],
+        "registrations": [],
+        "configuration_types": [],
+        "configuration_groups": [],
+    }

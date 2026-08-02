@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+import io
+import hashlib
+from pathlib import PurePath
+import subprocess
+import sys
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import pytest
 
@@ -9,22 +15,148 @@ from embodied_ops import (
     EvaluationPlan,
     OutputDirectoryTransaction,
     PublishedOutputCleanupError,
+    STANDARD_COLLECTION_INTERACTION,
+    TaskSelectionCancelled,
+    add_contract_digest,
     atomic_output_directory,
     atomic_output_file,
     create_only_output_file,
+    fetch_huggingface_artifact,
+    normalize_collection_start,
     normalize_episode_decision,
     require_fresh_sample,
     require_pair_skew,
     reset_required_after_episode,
+    select_task,
+    summarize_evaluation_progress,
+    validate_exact_metadata,
+    validate_artifact,
+    verify_code_checkout,
+    verify_code_environment,
     load_task_catalog,
     register_task_prompt,
     validate_experiment_name,
     write_json_once,
 )
+from embodied_ops.console import LiveStatusLine, label
 
 
 def _temporary_outputs(parent):
     return sorted(path for path in parent.iterdir() if ".staging-" in path.name)
+
+
+def test_console_has_stable_machine_readable_levels_and_run_status(monkeypatch) -> None:
+    monkeypatch.setenv("NO_COLOR", "1")
+    output = io.StringIO()
+    assert label("pass", stream=output) == "[PASS]"
+    status = LiveStatusLine(
+        stream=output,
+        redirected_interval_s=5.0,
+        monotonic=iter((0.0, 1.0, 6.0)).__next__,
+    )
+    status.update("starting")
+    status.update("hidden by throttle")
+    status.update("ready")
+    assert output.getvalue().splitlines() == ["[RUN] starting", "[RUN] ready"]
+
+
+def test_contract_digest_and_exact_validation_are_canonical() -> None:
+    expected = add_contract_digest({"protocol": "demo-v1", "shape": [2, 3]})
+    assert len(expected["contract_sha256"]) == 64
+    validate_exact_metadata(dict(expected), expected, label="demo")
+    with pytest.raises(RuntimeError, match="shape"):
+        validate_exact_metadata({**expected, "shape": [3, 2]}, expected, label="demo")
+
+
+def test_verified_artifact_store_reuses_identical_local_files(tmp_path, monkeypatch) -> None:
+    payload = b"portable model artifact\n"
+    digest = hashlib.sha256(payload).hexdigest()
+    cache_root = tmp_path / "cache"
+    cached = cache_root / "another-model" / "weights.bin"
+    cached.parent.mkdir(parents=True)
+    cached.write_bytes(payload)
+    root = tmp_path / "models" / "target"
+    config = SimpleNamespace(
+        artifact_root=root,
+        source=SimpleNamespace(
+            provider="huggingface",
+            repo_id="owner/model",
+            revision="a" * 40,
+        ),
+        manifest=SimpleNamespace(
+            files=(
+                SimpleNamespace(
+                    path=PurePath("weights.bin"),
+                    size=len(payload),
+                    sha256=digest,
+                ),
+            ),
+            sha256="b" * 64,
+        ),
+    )
+
+    def reject_download(**_kwargs) -> None:
+        raise AssertionError("identical local artifact should avoid a download")
+
+    monkeypatch.setitem(
+        sys.modules,
+        "huggingface_hub",
+        SimpleNamespace(snapshot_download=reject_download),
+    )
+    result = fetch_huggingface_artifact(config, cache_root=cache_root)
+
+    assert result.root == root
+    assert result.files == 1
+    assert (root / "weights.bin").read_bytes() == payload
+    assert validate_artifact(config, verify_hashes=True) == result
+
+
+def _git(checkout, *args: str) -> str:
+    return subprocess.run(
+        ("git", *args),
+        cwd=checkout,
+        check=True,
+        stdout=subprocess.PIPE,
+        text=True,
+    ).stdout.strip()
+
+
+def test_code_environment_verifies_checkout_lock_and_python(tmp_path) -> None:
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    _git(checkout, "init", "-q")
+    _git(checkout, "config", "user.name", "Test")
+    _git(checkout, "config", "user.email", "test@example.com")
+    (checkout / "source.py").write_text("VALUE = 1\n")
+    _git(checkout, "add", "source.py")
+    _git(checkout, "commit", "-q", "-m", "test")
+    repository = "https://example.com/owner/backend.git"
+    _git(checkout, "remote", "add", "origin", repository)
+    lock = tmp_path / "requirements.lock"
+    lock.write_text("example==1\n")
+    python = tmp_path / "environment/bin/python"
+    python.parent.mkdir(parents=True)
+    python.symlink_to(sys.executable)
+    config = SimpleNamespace(
+        source=SimpleNamespace(
+            repository=repository,
+            revision=_git(checkout, "rev-parse", "HEAD"),
+            checkout=checkout,
+        ),
+        environment=SimpleNamespace(
+            manager="requirements-lock",
+            python_version=f"{sys.version_info.major}.{sys.version_info.minor}",
+            python=python,
+            lock=lock,
+            lock_sha256=hashlib.sha256(lock.read_bytes()).hexdigest(),
+        ),
+    )
+
+    verify_code_checkout(config)
+    verify_code_environment(config)
+    lock.write_text("example==2\n")
+    with pytest.raises(ValueError, match="lock SHA256 mismatch"):
+        verify_code_checkout(config)
 
 
 def test_directory_transaction_preserves_previous_artifact_until_commit(tmp_path) -> None:
@@ -166,6 +298,18 @@ def test_collection_identity_and_episode_decisions_are_portable() -> None:
         after_save=False,
         after_discard=True,
     )
+    assert normalize_collection_start("") is EpisodeDecision.SAVE
+    assert normalize_collection_start("q") is EpisodeDecision.QUIT
+    with pytest.raises(ValueError, match="only while an episode is recording"):
+        normalize_collection_start("d")
+    assert STANDARD_COLLECTION_INTERACTION.start_action_ids == ("enter", "quit")
+    assert STANDARD_COLLECTION_INTERACTION.recording_action_ids == (
+        "enter",
+        "discard",
+        "quit",
+    )
+    assert "Enter=start recording" in STANDARD_COLLECTION_INTERACTION.start_prompt(3)
+    assert "Enter=save" in STANDARD_COLLECTION_INTERACTION.recording_notice(3)
 
 
 def test_task_registry_loads_in_order_and_registers_create_only(tmp_path) -> None:
@@ -237,6 +381,29 @@ def test_task_registry_rejects_paths_and_duplicate_prompt_text(tmp_path) -> None
         )
 
 
+def test_task_selection_has_one_standard_number_id_prompt_and_cancel_flow(tmp_path) -> None:
+    root = tmp_path
+    directory = root / "configs/tasks/fruit"
+    prompts = directory / "prompts"
+    prompts.mkdir(parents=True)
+    (directory / "catalog.json").write_text('{"schema_version":1,"id":"fruit-placement"}\n')
+    (prompts / "apple.json").write_text(
+        '{"schema_version":1,"order":10,"id":"apple",'
+        '"prompt":"pick the apple","distribution":"train"}\n'
+    )
+    catalog = load_task_catalog(directory / "catalog.json", repo_root=root)
+
+    for answer in ("1", "apple", "pick the apple"):
+        output = io.StringIO()
+        assert (
+            select_task(catalog, input_fn=lambda value=answer: value, output=output).task_id
+            == "apple"
+        )
+        assert "without starting model or hardware" in output.getvalue()
+    with pytest.raises(TaskSelectionCancelled, match="cancelled"):
+        select_task(catalog, input_fn=lambda: "q", output=io.StringIO())
+
+
 @dataclass(frozen=True)
 class Sample:
     seq: int
@@ -306,6 +473,11 @@ def test_evaluation_plan_assigns_stable_slots() -> None:
         "sequence": 5,
         "total": 6,
     }
+    progress = summarize_evaluation_progress(plan, (1, 2, 2, 5))
+    assert progress.completed_sequences == (1, 2, 5)
+    assert progress.duplicate_sequences == (2,)
+    assert progress.completed_count == 3
+    assert progress.pending_count == 3
 
     with pytest.raises(ValueError, match="unique"):
         EvaluationPlan("bad-plan", ("same", "same"), 1)

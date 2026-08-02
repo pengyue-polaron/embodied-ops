@@ -8,11 +8,11 @@
   <a href="LICENSE"><img alt="Apache-2.0 License" src="https://img.shields.io/badge/License-Apache--2.0-blue.svg"></a>
 </p>
 
-`embodied-ops` contains the workflow primitives that sit above robot and policy
-adapters: episode decisions, sample-timing checks, deterministic evaluation
-plans, transactional artifact publication, and an adapter-driven local Operator
-Panel. The package has no runtime dependencies and does not define a competing
-robot API.
+`embodied-ops` defines the operator-workflow layer that sits above robot and
+policy adapters: a consistent CLI vocabulary, collection interaction, task
+selection, sample-timing checks, deterministic evaluation, verified artifacts,
+and an adapter-driven local Operator Panel. The package has no runtime
+dependencies and does not define a competing robot API.
 
 ## Install
 
@@ -24,11 +24,12 @@ python -m pip install embodied-ops
 
 | Area | Public contract |
 | --- | --- |
-| Collection | Portable experiment IDs, episode decisions, reset policy, sample freshness and pair skew |
-| Tasks | Strict create-only JSON prompt catalogs shared by collection and evaluation adapters |
-| Evaluation | Stable task/repetition plans and deterministic run slots |
-| Artifacts | Atomic file and directory publication, create-only reports, JSON helpers, and SHA-256 digests |
-| Operator Panel | Minimal repository adapters, normalized camera health, optional capability providers, exclusive workflow supervision, guarded input, typed progress, and format-driven document creation |
+| CLI | Stable `INFO`/`STEP`/`PASS`/`WARN`/`FAIL` presentation, machine-readable no-color output, and live status lines |
+| Collection | Standard Enter-to-Start/Save, Discard, and Quit actions; portable experiment IDs; episode decisions; sample freshness and pair skew |
+| Tasks | Strict create-only JSON prompt catalogs and one number/id/exact-prompt selection flow |
+| Evaluation | Stable task/repetition plans, deterministic run slots, and portable progress summaries |
+| Artifacts | Atomic publication, exact manifests, verified Hugging Face retrieval, contract digests, and pinned code environments |
+| Operator Panel | Versioned catalog and form schema, packaged Web presentation, minimal repository adapters, normalized camera health, exclusive workflow supervision, guarded input, typed progress, and format-driven document creation |
 
 Use the native interface of the framework that owns the hardware integration,
 such as LeRobot `Robot` and `Teleoperator`. ROS nodes, drivers, control leases,
@@ -39,9 +40,11 @@ the adapter-provided top-level workflow command.
 ## Operator Panel
 
 A robot repository implements the minimal `PanelAdapter` and owns every catalog
-value, command, and hardware decision. Optional camera, configuration, and
-registration providers add only the features that repository supports. The
-generic package serves the UI and runs one validated workflow at a time:
+value, command, and hardware decision. The catalog must use the public versioned
+schema; reusable field builders leave only choices, labels, and capabilities to
+the adapter. Optional camera, configuration, and registration providers add
+only the features that repository supports. The generic package serves the same
+packaged UI and runs one validated workflow at a time:
 
 ```python
 from embodied_ops.operator_panel import serve_operator_panel

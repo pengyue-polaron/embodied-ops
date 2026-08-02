@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import math
 import re
+from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol, TypeVar
+
+from .interaction import InputAction
 
 EXPERIMENT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
@@ -17,6 +20,58 @@ class EpisodeDecision(str, Enum):
 
     def __str__(self) -> str:
         return self.value
+
+
+@dataclass(frozen=True, slots=True)
+class CollectionInteraction:
+    """One standard episode interaction shared by terminal and Web clients."""
+
+    input_actions: tuple[InputAction, ...]
+    start_action_ids: tuple[str, ...]
+    recording_action_ids: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        action_ids = tuple(action.action_id for action in self.input_actions)
+        if len(set(action_ids)) != len(action_ids):
+            raise ValueError("collection input action ids must be unique")
+        for phase, available in (
+            ("start", self.start_action_ids),
+            ("recording", self.recording_action_ids),
+        ):
+            if not available or len(set(available)) != len(available):
+                raise ValueError(f"collection {phase} action ids must be non-empty and unique")
+            unknown = sorted(set(available) - set(action_ids))
+            if unknown:
+                raise ValueError(f"collection {phase} uses unknown actions: {unknown}")
+
+    def start_prompt(self, episode_index: int) -> str:
+        if (
+            not isinstance(episode_index, int)
+            or isinstance(episode_index, bool)
+            or episode_index < 0
+        ):
+            raise ValueError("episode index must be a non-negative integer")
+        return f"  [{episode_index}] Enter=start recording, q=quit > "
+
+    def recording_notice(self, episode_index: int) -> str:
+        if (
+            not isinstance(episode_index, int)
+            or isinstance(episode_index, bool)
+            or episode_index < 0
+        ):
+            raise ValueError("episode index must be a non-negative integer")
+        return f"Episode {episode_index} recording: Enter=save, d+Enter=discard, q+Enter=quit"
+
+
+STANDARD_COLLECTION_INTERACTION = CollectionInteraction(
+    input_actions=(
+        InputAction("enter", "Start / Save", "\n", "primary"),
+        InputAction("discard", "Discard", "d\n", "danger"),
+        InputAction("quit", "Quit", "q\n", "quiet"),
+    ),
+    start_action_ids=("enter", "quit"),
+    recording_action_ids=("enter", "discard", "quit"),
+)
 
 
 def reset_required_after_episode(
@@ -63,6 +118,15 @@ def normalize_episode_decision(text: str | None) -> EpisodeDecision:
     if value in {"q", "quit", "exit"}:
         return EpisodeDecision.QUIT
     raise ValueError(f"unknown episode decision: {text!r}")
+
+
+def normalize_collection_start(text: str | None) -> EpisodeDecision:
+    """Accept only start or quit at the standard pre-episode prompt."""
+
+    decision = normalize_episode_decision(text)
+    if decision is EpisodeDecision.DISCARD:
+        raise ValueError("discard is available only while an episode is recording")
+    return decision
 
 
 class TimedSample(Protocol):

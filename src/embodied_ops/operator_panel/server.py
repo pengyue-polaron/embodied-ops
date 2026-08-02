@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from .catalog import validate_panel_catalog
 from .contracts import JsonObject, PanelAdapter
 from .process import WorkflowProcess
 
@@ -22,8 +23,12 @@ MAX_REQUEST_BYTES = 256 * 1024
 class OperatorPanelApplication:
     def __init__(self, adapter: PanelAdapter) -> None:
         self.adapter = adapter
+        validate_panel_catalog(adapter.catalog())
         self.token = secrets.token_urlsafe(32)
         self.workflow = WorkflowProcess(Path(adapter.repo_root))
+
+    def catalog(self) -> JsonObject:
+        return validate_panel_catalog(self.adapter.catalog())
 
     def camera_health(self) -> JsonObject:
         provider = self.adapter.capabilities.camera
@@ -45,7 +50,7 @@ class OperatorPanelApplication:
         if self.workflow.snapshot()["active"]:
             raise RuntimeError("cannot create a configuration while a workflow is active")
         result = provider.create_config(payload)
-        return {**result, "catalog": self.adapter.catalog()}
+        return {**result, "catalog": self.catalog()}
 
     def config_template(self, payload: JsonObject) -> JsonObject:
         provider = self.adapter.capabilities.configuration
@@ -70,7 +75,7 @@ class OperatorPanelApplication:
         if not isinstance(registration, str) or not isinstance(values, dict):
             raise ValueError("register requires a registration id and values")
         result = provider.register(registration, values)
-        return {**result, "catalog": self.adapter.catalog()}
+        return {**result, "catalog": self.catalog()}
 
 
 class _CapabilityUnavailable(LookupError):
@@ -137,7 +142,7 @@ def _handler_type(app: OperatorPanelApplication, asset_root: Path) -> type[BaseH
                 self._send_asset("panel.js", "text/javascript; charset=utf-8")
                 return
             if path == "/api/catalog":
-                self._send_json(HTTPStatus.OK, app.adapter.catalog())
+                self._send_json(HTTPStatus.OK, app.catalog())
                 return
             if path == "/api/camera-health":
                 try:

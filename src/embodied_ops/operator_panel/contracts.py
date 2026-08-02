@@ -6,16 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from ..interaction import InputAction
+
 
 JsonObject = dict[str, Any]
-
-
-@dataclass(frozen=True)
-class InputAction:
-    action_id: str
-    label: str
-    line: str
-    tone: str = "default"
 
 
 @dataclass(frozen=True)

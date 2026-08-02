@@ -116,5 +116,48 @@ class EvaluationPlan:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class EvaluationProgress:
+    """Portable completion summary for one deterministic evaluation plan."""
+
+    total: int
+    completed_sequences: tuple[int, ...]
+    duplicate_sequences: tuple[int, ...]
+
+    @property
+    def completed_count(self) -> int:
+        return len(self.completed_sequences)
+
+    @property
+    def pending_count(self) -> int:
+        return self.total - self.completed_count
+
+
+def summarize_evaluation_progress(
+    plan: EvaluationPlan,
+    completed_sequences: tuple[int, ...],
+) -> EvaluationProgress:
+    """Validate completed slot numbers and summarize resume state."""
+
+    counts: dict[int, int] = {}
+    for sequence in completed_sequences:
+        if (
+            not isinstance(sequence, int)
+            or isinstance(sequence, bool)
+            or not 1 <= sequence <= plan.total_slots
+        ):
+            raise ValueError(
+                f"evaluation completion sequence must be in 1..{plan.total_slots}: {sequence!r}"
+            )
+        counts[sequence] = counts.get(sequence, 0) + 1
+    return EvaluationProgress(
+        total=plan.total_slots,
+        completed_sequences=tuple(sorted(counts)),
+        duplicate_sequences=tuple(
+            sorted(sequence for sequence, count in counts.items() if count > 1)
+        ),
+    )
+
+
 def _plain_positive_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
