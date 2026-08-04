@@ -1,23 +1,26 @@
 <h1 align="center">embodied-ops</h1>
 
 <p align="center">
-  Reliable collection, evaluation, artifact, and operator workflows for embodied AI.
+  Hardware-independent operational workflows for embodied AI.
 </p>
 
 <p align="center">
   <a href="LICENSE"><img alt="Apache-2.0 License" src="https://img.shields.io/badge/License-Apache--2.0-blue.svg"></a>
 </p>
 
-`embodied-ops` defines the operator-workflow layer that sits above robot and
+`embodied-ops` defines the reusable operational layer that sits above robot and
 policy adapters: a consistent CLI vocabulary, collection interaction, task
 selection, sample-timing checks, deterministic evaluation, verified artifacts,
-and an adapter-driven local Operator Panel. The package has no runtime
-dependencies and does not define a competing robot API.
+and an adapter-driven local Operator Panel. The core package has no mandatory
+runtime dependencies and does not define a competing robot API.
 
 ## Install
 
 ```bash
 python -m pip install embodied-ops
+
+# Only when using the Hugging Face artifact provider
+python -m pip install "embodied-ops[huggingface]"
 ```
 
 ## Scope
@@ -31,11 +34,19 @@ python -m pip install embodied-ops
 | Artifacts | Atomic publication, exact manifests, verified Hugging Face retrieval, contract digests, and pinned code environments |
 | Operator Panel | Versioned catalog and form schema, packaged Web presentation, minimal repository adapters, normalized camera health, exclusive workflow supervision, guarded input, typed progress, and format-driven document creation |
 
-Use the native interface of the framework that owns the hardware integration,
-such as LeRobot `Robot` and `Teleoperator`. ROS nodes, drivers, control leases,
-safety limits, datasets, policies, and hardware process lifecycles remain in
-those framework or robot-specific packages. The Operator Panel supervises only
-the adapter-provided top-level workflow command.
+The package owns cross-robot operational mechanics only. Robot repositories
+still own hardware identities, feature semantics, provenance, readiness gates,
+and physical safety. Use the native interface of the framework that owns the
+hardware integration, such as LeRobot `Robot` and `Teleoperator`. ROS nodes,
+drivers, control leases, safety limits, policies, and hardware process
+lifecycles remain in those framework or robot-specific packages. The Operator
+Panel supervises only the adapter-provided top-level workflow command.
+
+Reusable dataset-format mechanics may live here when at least two real robot
+integrations share the same contract. Robot-specific dataset schema, task
+policy, provenance, and collection composition remain with each Runtime. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the ownership rules and the
+current-versus-target boundary.
 
 ## Operator Panel
 

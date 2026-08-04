@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install --upgrade build
+      - run: python -m pip install --upgrade build twine
       - name: Verify release tag
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
@@ -31,6 +31,7 @@ jobs:
               raise SystemExit(f"release tag must be {expected}, got {os.environ['RELEASE_TAG']}")
           PY
       - run: python -m build
+      - run: python -m twine check dist/*
       - uses: actions/upload-artifact@v4
         with:
           name: distributions

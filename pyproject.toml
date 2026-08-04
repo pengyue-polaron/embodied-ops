@@ -1,7 +1,7 @@
 [project]
 name = "embodied-ops"
 version = "0.6.0"
-description = "Collection, evaluation, artifact, and operator workflows for embodied AI"
+description = "Hardware-independent operational workflows for embodied AI"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
@@ -19,6 +19,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = []
+
+[project.optional-dependencies]
+huggingface = ["huggingface-hub>=1.0.0,<2.0.0"]
 
 [project.urls]
 Homepage = "https://github.com/pengyue-polaron/embodied-ops"
