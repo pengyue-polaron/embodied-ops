@@ -21,6 +21,9 @@ python -m pip install embodied-ops
 
 # Only when using the Hugging Face artifact provider
 python -m pip install "embodied-ops[huggingface]"
+
+# Shared LeRobot v3 validation and v3-to-v2.1 conversion
+python -m pip install "embodied-ops[lerobot-dataset]"
 ```
 
 ## Scope
@@ -33,6 +36,7 @@ python -m pip install "embodied-ops[huggingface]"
 | Evaluation | Stable task/repetition plans, deterministic run slots, and portable progress summaries |
 | Artifacts | Atomic publication, exact manifests, verified Hugging Face retrieval, contract digests, and pinned code environments |
 | Operator Panel | Versioned catalog and form schema, packaged Web presentation, minimal repository adapters, normalized camera health, exclusive workflow supervision, guarded input, typed progress, and format-driven document creation |
+| Dataset interoperability | LeRobot v3 payload-graph validation and a format-only v3-to-v2.1 builder; Runtime callers supply robot task, feature, statistics, and provenance constraints |
 
 The package owns cross-robot operational mechanics only. Robot repositories
 still own hardware identities, feature semantics, provenance, readiness gates,
@@ -42,11 +46,12 @@ drivers, control leases, safety limits, policies, and hardware process
 lifecycles remain in those framework or robot-specific packages. The Operator
 Panel supervises only the adapter-provided top-level workflow command.
 
-Reusable dataset-format mechanics may live here when at least two real robot
-integrations share the same contract. Robot-specific dataset schema, task
-policy, provenance, and collection composition remain with each Runtime. See
+Reusable LeRobot dataset-format mechanics live in
+`embodied_ops.datasets.lerobot`, proven by the Galaxea A1 and VLAI L1 Runtime
+integrations. Robot-specific dataset schema, task policy, provenance, and
+collection composition remain with each Runtime. See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the ownership rules and the
-current-versus-target boundary.
+dependency boundary.
 
 ## Operator Panel
 

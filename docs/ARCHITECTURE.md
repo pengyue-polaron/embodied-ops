@@ -18,14 +18,14 @@ Optional integrations must be isolated behind extras so importing the core
 package remains dependency-free. Provider or dataset dependencies are loaded
 only when the corresponding feature is used.
 
-## Current and target scope
+## Current scope
 
-Version 0.6 implements the operator-workflow, artifact, timing, task,
-evaluation and Operator Panel rows above. Dataset interoperability is the next
-shared module: Galaxea A1 and VLAI L1 already contain independently evolved
-LeRobot v3 graph validation and v3-to-v2.1 conversion implementations with the
-same core semantics. That common engine belongs here; their schemas and
-provenance do not.
+Version 0.7 implements the operator-workflow, artifact, timing, task,
+evaluation, Operator Panel, and dataset-interoperability rows above. The shared
+dataset module validates LeRobot v3 metadata/payload graphs and builds the
+format-only portion of v2.1 derivatives. Galaxea A1 and VLAI L1 provide the
+robot feature requirements, task/provenance checks, publication transaction,
+and robot-specific derivative metadata around that engine.
 
 Local robot transports are not currently a public `embodied-ops` contract.
 The experimental generic RPC API released in 0.2 was removed in 0.3 before the

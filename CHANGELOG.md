@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0
+
+- Add shared hardware-independent validation for complete LeRobot v3 dataset
+  graphs, with caller-provided task, feature, count, and statistics constraints.
+- Add a format-only LeRobot v3-to-v2.1 builder with episode Parquet output,
+  H.264 video slicing, geometry checks, and v2.1 metadata generation.
+- Keep NumPy, pandas, and PyArrow behind the `lerobot-dataset` extra; FFmpeg is
+  checked only when a dataset actually contains video.
+
 ## 0.6.0
 
 - Standardize dependency-free CLI levels, status presentation, task selection,

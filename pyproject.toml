@@ -1,6 +1,6 @@
 [project]
 name = "embodied-ops"
-version = "0.6.0"
+version = "0.7.0"
 description = "Hardware-independent operational workflows for embodied AI"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,6 +22,11 @@ dependencies = []
 
 [project.optional-dependencies]
 huggingface = ["huggingface-hub>=1.0.0,<2.0.0"]
+lerobot-dataset = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "pyarrow>=14.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/pengyue-polaron/embodied-ops"
