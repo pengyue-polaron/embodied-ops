@@ -8,7 +8,7 @@ semantics across multiple robot integrations. It is not a universal robot API.
 
 | Layer | `embodied-ops` owns | Robot Runtime owns |
 | --- | --- | --- |
-| Operator workflow | CLI presentation, collection decisions, task selection, evaluation plans, Panel schemas and supervision | Available commands, readiness gates, workflow composition and hardware decisions |
+| Operator workflow | CLI levels, check/dataset result presentation, collection decisions and summaries, task selection, evaluation plans, Panel schemas and supervision | Available commands, readiness gates, workflow composition and hardware decisions |
 | Artifacts | Atomic publication, digests, verified provider retrieval and pinned code environments | Artifact identity, model policy, credentials and retention |
 | Timing | Freshness, pair-skew and portable progress contracts | Sensor clocks, capture ownership and acceptable limits |
 | Dataset interoperability | Shared format readers, validators and conversions proven by at least two integrations | Robot feature schema, task policy, provenance, collection and derivative configuration |
@@ -20,7 +20,7 @@ only when the corresponding feature is used.
 
 ## Current scope
 
-Version 0.7 implements the operator-workflow, artifact, timing, task,
+Version 0.8 implements the operator-workflow, artifact, timing, task,
 evaluation, Operator Panel, and dataset-interoperability rows above. The shared
 dataset module validates LeRobot v3 metadata/payload graphs and builds the
 format-only portion of v2.1 derivatives. Galaxea A1 and VLAI L1 provide the

@@ -28,25 +28,26 @@ LEVEL_TONES = {
 }
 
 
-def color_enabled(stream: TextIO = sys.stdout) -> bool:
+def color_enabled(stream: TextIO | None = None) -> bool:
     """Honor ``NO_COLOR`` and never color redirected output."""
 
-    return not os.environ.get("NO_COLOR") and stream.isatty()
+    output = stream or sys.stdout
+    return not os.environ.get("NO_COLOR") and output.isatty()
 
 
-def style(text: str, tone: Tone, *, stream: TextIO = sys.stdout) -> str:
+def style(text: str, tone: Tone, *, stream: TextIO | None = None) -> str:
     if not color_enabled(stream):
         return text
     return f"\033[{tone.value}m{text}\033[0m"
 
 
-def label(level: str, *, stream: TextIO = sys.stdout) -> str:
+def label(level: str, *, stream: TextIO | None = None) -> str:
     normalized = level.upper()
     tone = LEVEL_TONES.get(normalized, Tone.INFO)
     return style(f"[{normalized}]", tone, stream=stream)
 
 
-def padded_label(level: str, *, width: int = 6, stream: TextIO = sys.stdout) -> str:
+def padded_label(level: str, *, width: int = 6, stream: TextIO | None = None) -> str:
     normalized = level.upper()
     tone = LEVEL_TONES.get(normalized, Tone.INFO)
     return style(f"[{normalized}]".ljust(width), tone, stream=stream)
@@ -56,10 +57,11 @@ def emit(
     level: str,
     message: str,
     *,
-    stream: TextIO = sys.stdout,
+    stream: TextIO | None = None,
     flush: bool = True,
 ) -> None:
-    print(f"{label(level, stream=stream)} {message}", file=stream, flush=flush)
+    output = stream or sys.stdout
+    print(f"{label(level, stream=output)} {message}", file=output, flush=flush)
 
 
 def info(message: str, *, flush: bool = True) -> None:
@@ -88,16 +90,16 @@ class LiveStatusLine:
     def __init__(
         self,
         *,
-        stream: TextIO = sys.stdout,
+        stream: TextIO | None = None,
         redirected_interval_s: float = 5.0,
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         if redirected_interval_s <= 0:
             raise ValueError("redirected status interval must be positive")
-        self.stream = stream
+        self.stream = stream or sys.stdout
         self.redirected_interval_s = redirected_interval_s
         self.monotonic = monotonic
-        self._tty = stream.isatty()
+        self._tty = self.stream.isatty()
         self._visible_width = 0
         self._last_redirected_at: float | None = None
 

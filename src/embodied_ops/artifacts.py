@@ -43,6 +43,23 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def directory_sha256(root: Path, *, exclude: set[Path] | None = None) -> str:
+    """Hash a directory from sorted relative paths and individual file digests."""
+
+    resolved = root.expanduser().resolve()
+    if not resolved.is_dir():
+        raise ValueError(f"directory does not exist: {resolved}")
+    excluded = exclude or set()
+    digest = hashlib.sha256()
+    for path in sorted(item for item in resolved.rglob("*") if item.is_file()):
+        relative = path.relative_to(resolved)
+        if relative in excluded:
+            continue
+        digest.update(str(relative).encode())
+        digest.update(file_sha256(path).encode())
+    return digest.hexdigest()
+
+
 def _exists(path: Path) -> bool:
     return path.exists() or path.is_symlink()
 

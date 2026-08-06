@@ -30,8 +30,8 @@ python -m pip install "embodied-ops[lerobot-dataset]"
 
 | Area | Public contract |
 | --- | --- |
-| CLI | Stable `INFO`/`STEP`/`PASS`/`WARN`/`FAIL` presentation, machine-readable no-color output, and live status lines |
-| Collection | Standard Enter-to-Start/Save, Discard, and Quit actions; reset-point policy; streaming leading-stillness trimming; portable experiment IDs; episode decisions; sample freshness and pair skew |
+| CLI | Stable `INFO`/`STEP`/`PASS`/`WARN`/`FAIL` presentation, shared hardware-check tables, human/JSON dataset reports, and live status lines |
+| Collection | Standard session, capture, outcome, and final-summary wording; Enter-to-Start/Save, Discard, and Quit actions; reset-point policy; streaming leading-stillness trimming; portable experiment IDs; sample freshness and pair skew |
 | Tasks | Strict create-only JSON prompt catalogs and one number/id/exact-prompt selection flow |
 | Evaluation | Stable task/repetition plans, deterministic run slots, and portable progress summaries |
 | Artifacts | Atomic publication, exact manifests, verified Hugging Face retrieval, contract digests, and pinned code environments |

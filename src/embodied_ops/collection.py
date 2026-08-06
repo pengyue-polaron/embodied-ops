@@ -186,13 +186,20 @@ class CollectionInteraction:
                 raise ValueError(f"collection {phase} uses unknown actions: {unknown}")
 
     def start_prompt(self, episode_index: int) -> str:
+        return f"  {self.start_notice(episode_index)} > "
+
+    def start_notice(self, episode_index: int) -> str:
         if (
             not isinstance(episode_index, int)
             or isinstance(episode_index, bool)
             or episode_index < 0
         ):
             raise ValueError("episode index must be a non-negative integer")
-        return f"  [{episode_index}] Enter=start recording, q=quit > "
+        commands = ["Enter=start recording"]
+        if "reset" in self.start_action_ids:
+            commands.append("r=reset position")
+        commands.append("q=quit")
+        return f"Episode {episode_index} ready · {', '.join(commands)}"
 
     def recording_notice(self, episode_index: int) -> str:
         if (
@@ -201,7 +208,7 @@ class CollectionInteraction:
             or episode_index < 0
         ):
             raise ValueError("episode index must be a non-negative integer")
-        return f"Episode {episode_index} recording: Enter=save, d+Enter=discard, q+Enter=quit"
+        return f"Episode {episode_index} recording · Enter=save, d+Enter=discard, q+Enter=quit"
 
 
 STANDARD_COLLECTION_INTERACTION = CollectionInteraction(
