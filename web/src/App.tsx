@@ -388,12 +388,12 @@ function CameraDeck({
         </div>
       </CardHeader>
       {!collapsed && (
-        <CardContent className="grid gap-px bg-border p-0 sm:grid-cols-2 xl:grid-cols-3">
+        <CardContent className={cn("grid gap-px bg-border p-0", cameraGridColumns(cameras.length))}>
           {cameras.map((camera) => {
             const stream = health?.streams[camera.id]
             const state = cameraState(health, stream)
             return (
-              <figure key={camera.id} className="group relative min-h-44 overflow-hidden bg-black xl:min-h-52">
+              <figure key={camera.id} className="group relative min-h-32 overflow-hidden bg-black sm:min-h-44 xl:min-h-52">
                 <img
                   src={`${cameraUrl(camera)}?panel_refresh=${epoch}`}
                   alt={`${camera.label} camera stream`}
@@ -410,6 +410,13 @@ function CameraDeck({
       )}
     </Card>
   )
+}
+
+function cameraGridColumns(count: number): string {
+  if (count <= 1) return "grid-cols-1"
+  if (count === 2) return "grid-cols-2"
+  if (count === 3) return "grid-cols-2 xl:grid-cols-3"
+  return "grid-cols-2 xl:grid-cols-4"
 }
 
 function WorkflowForm({
