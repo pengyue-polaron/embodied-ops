@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import math
 import re
+from collections import deque
 from dataclasses import dataclass
 from enum import Enum
-from typing import Protocol, TypeVar
+from typing import Generic, Protocol, TypeVar
 
 from .interaction import InputAction
 
@@ -20,6 +21,146 @@ class EpisodeDecision(str, Enum):
 
     def __str__(self) -> str:
         return self.value
+
+
+@dataclass(frozen=True, slots=True)
+class CollectionResetPolicy:
+    """Cross-robot reset points; adapters still own the physical reset."""
+
+    before_collection: bool
+    after_save: bool
+    after_discard: bool
+
+    def __post_init__(self) -> None:
+        for name in ("before_collection", "after_save", "after_discard"):
+            if not isinstance(getattr(self, name), bool):
+                raise TypeError(f"{name} must be a boolean")
+
+    def required_after(self, decision: EpisodeDecision | str) -> bool:
+        normalized = EpisodeDecision(decision)
+        if normalized is EpisodeDecision.SAVE:
+            return self.after_save
+        if normalized is EpisodeDecision.DISCARD:
+            return self.after_discard
+        return False
+
+
+@dataclass(frozen=True, slots=True)
+class LeadingStillnessConfig:
+    """Streaming motion gate for removing stationary episode prefixes."""
+
+    enabled: bool
+    action_thresholds: tuple[float, ...]
+    reference_frames: int
+    motion_frames: int
+    preroll_frames: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.enabled, bool):
+            raise TypeError("enabled must be a boolean")
+        if not self.action_thresholds:
+            raise ValueError("action_thresholds must not be empty")
+        if any(not math.isfinite(value) or value <= 0 for value in self.action_thresholds):
+            raise ValueError("action_thresholds must contain only finite positive values")
+        for name in ("reference_frames", "motion_frames"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{name} must be a positive integer")
+        if (
+            isinstance(self.preroll_frames, bool)
+            or not isinstance(self.preroll_frames, int)
+            or self.preroll_frames < 0
+        ):
+            raise ValueError("preroll_frames must be a non-negative integer")
+
+
+@dataclass(frozen=True, slots=True)
+class LeadingStillnessResult:
+    started: bool
+    seen_frames: int
+    emitted_frames: int
+    trimmed_frames: int
+
+
+FrameT = TypeVar("FrameT")
+
+
+class LeadingStillnessTrimmer(Generic[FrameT]):
+    """Buffer a bounded prefix and emit frames once sustained motion begins."""
+
+    def __init__(self, config: LeadingStillnessConfig) -> None:
+        if not isinstance(config, LeadingStillnessConfig):
+            raise TypeError("LeadingStillnessTrimmer requires LeadingStillnessConfig")
+        self.config = config
+        self._reference_samples: list[tuple[float, ...]] = []
+        self._reference: tuple[float, ...] | None = None
+        self._buffer: deque[FrameT] = deque(maxlen=config.preroll_frames + config.motion_frames)
+        self._motion_count = 0
+        self._started = False
+        self._seen_frames = 0
+        self._emitted_frames = 0
+
+    @property
+    def result(self) -> LeadingStillnessResult:
+        return LeadingStillnessResult(
+            started=self._started,
+            seen_frames=self._seen_frames,
+            emitted_frames=self._emitted_frames,
+            trimmed_frames=self._seen_frames - self._emitted_frames,
+        )
+
+    def push(self, frame: FrameT, action: tuple[float, ...]) -> tuple[FrameT, ...]:
+        """Accept one frame and return the zero or more frames ready for storage."""
+
+        values = self._validate_action(action)
+        self._seen_frames += 1
+        if not self.config.enabled or self._started:
+            self._started = True
+            self._emitted_frames += 1
+            return (frame,)
+
+        self._buffer.append(frame)
+        if self._reference is None:
+            self._reference_samples.append(values)
+            if len(self._reference_samples) == self.config.reference_frames:
+                self._reference = tuple(
+                    sum(sample[index] for sample in self._reference_samples)
+                    / self.config.reference_frames
+                    for index in range(len(values))
+                )
+            return ()
+
+        moving = any(
+            abs(value - reference) >= threshold
+            for value, reference, threshold in zip(
+                values,
+                self._reference,
+                self.config.action_thresholds,
+                strict=True,
+            )
+        )
+        self._motion_count = self._motion_count + 1 if moving else 0
+        if self._motion_count < self.config.motion_frames:
+            return ()
+
+        self._started = True
+        ready = tuple(self._buffer)
+        self._buffer.clear()
+        self._emitted_frames += len(ready)
+        return ready
+
+    def _validate_action(self, action: tuple[float, ...]) -> tuple[float, ...]:
+        if not isinstance(action, tuple):
+            raise TypeError("action must be a tuple")
+        if len(action) != len(self.config.action_thresholds):
+            raise ValueError(
+                "action length does not match action_thresholds: "
+                f"{len(action)} != {len(self.config.action_thresholds)}"
+            )
+        values = tuple(float(value) for value in action)
+        if any(not math.isfinite(value) for value in values):
+            raise ValueError("action must contain only finite values")
+        return values
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,14 +223,11 @@ def reset_required_after_episode(
 ) -> bool:
     """Return the configured reset policy for a completed episode decision."""
 
-    if not isinstance(after_save, bool) or not isinstance(after_discard, bool):
-        raise TypeError("episode reset policy values must be booleans")
-    normalized = EpisodeDecision(decision)
-    if normalized is EpisodeDecision.SAVE:
-        return after_save
-    if normalized is EpisodeDecision.DISCARD:
-        return after_discard
-    return False
+    return CollectionResetPolicy(
+        before_collection=False,
+        after_save=after_save,
+        after_discard=after_discard,
+    ).required_after(decision)
 
 
 def validate_experiment_name(value: str) -> str:

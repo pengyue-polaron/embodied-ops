@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 5%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 5%;
+    --primary: 0 0% 5%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 38%;
+    --accent: 0 0% 91%;
+    --accent-foreground: 0 0% 8%;
+    --destructive: 0 0% 10%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 82%;
+    --input: 0 0% 74%;
+    --ring: 0 0% 8%;
+    --radius: 0.45rem;
+  }
+
+  * { @apply border-border; }
+  body {
+    @apply m-0 bg-background font-sans text-foreground antialiased;
+    background-image:
+      linear-gradient(to right, hsl(0 0% 0% / 0.025) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(0 0% 0% / 0.025) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  button, input, select, textarea { font: inherit; }
+  ::selection { @apply bg-foreground text-background; }
+}
+
+.terminal {
+  scrollbar-color: #555 #0b0b0b;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 640px) {
+  figure img { min-height: 11rem; }
+}

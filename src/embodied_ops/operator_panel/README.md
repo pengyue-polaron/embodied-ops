@@ -41,5 +41,15 @@ submitted value remains plain text and is validated by the consuming adapter.
 The terminal has its own bounded scroll area. It follows appended output only
 while the viewer is already at the bottom, preserving their position while they
 inspect older lines. Ordinary `[RUN]` status lines are similarly transient; the
-latest one is shown above the terminal. Colors follow the browser's light or
-dark preference.
+latest one is shown above the terminal. The presentation uses one high-contrast
+black-and-white theme so both Runtime adapters expose the same visual language.
+
+The packaged presentation is built from `web/` with React, TypeScript, and
+checked-in shadcn/ui components. Its deliberately monochrome, dense layout is
+shared unchanged by every adapter. The Python server remains runtime
+dependency-free and serves only the generated `index.html`, JavaScript, CSS,
+and local font assets.
+
+Workflow mutations and workflow start are serialized at the application
+boundary, so configuration or registration publication cannot race a new
+subprocess start.

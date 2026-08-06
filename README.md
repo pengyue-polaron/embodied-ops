@@ -31,11 +31,11 @@ python -m pip install "embodied-ops[lerobot-dataset]"
 | Area | Public contract |
 | --- | --- |
 | CLI | Stable `INFO`/`STEP`/`PASS`/`WARN`/`FAIL` presentation, machine-readable no-color output, and live status lines |
-| Collection | Standard Enter-to-Start/Save, Discard, and Quit actions; portable experiment IDs; episode decisions; sample freshness and pair skew |
+| Collection | Standard Enter-to-Start/Save, Discard, and Quit actions; reset-point policy; streaming leading-stillness trimming; portable experiment IDs; episode decisions; sample freshness and pair skew |
 | Tasks | Strict create-only JSON prompt catalogs and one number/id/exact-prompt selection flow |
 | Evaluation | Stable task/repetition plans, deterministic run slots, and portable progress summaries |
 | Artifacts | Atomic publication, exact manifests, verified Hugging Face retrieval, contract digests, and pinned code environments |
-| Operator Panel | Versioned catalog and form schema, packaged Web presentation, minimal repository adapters, normalized camera health, exclusive workflow supervision, guarded input, typed progress, and format-driven document creation |
+| Operator Panel | Versioned catalog and form schema, packaged shadcn/ui Web presentation, minimal repository adapters, normalized camera health, exclusive workflow supervision, guarded input, typed progress, and format-driven document creation |
 | Dataset interoperability | LeRobot v3 payload-graph validation and a format-only v3-to-v2.1 builder; Runtime callers supply robot task, feature, statistics, and provenance constraints |
 
 The package owns cross-robot operational mechanics only. Robot repositories
@@ -72,6 +72,16 @@ Child processes may announce guarded input and display-only progress through
 `announce_input()` and `announce_progress()`. See
 [`src/embodied_ops/operator_panel/README.md`](src/embodied_ops/operator_panel/README.md)
 for the adapter and presentation contracts.
+
+The Web source lives under `web/` as a Vite + React + TypeScript application.
+It uses checked-in shadcn/ui components and compiles to the dependency-free
+package assets served by Python:
+
+```bash
+cd web
+npm ci
+npm run build
+```
 
 ## Atomic artifacts
 

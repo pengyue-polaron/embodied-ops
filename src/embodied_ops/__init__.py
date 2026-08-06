@@ -22,7 +22,11 @@ from .artifact_store import (
 )
 from .collection import (
     CollectionInteraction,
+    CollectionResetPolicy,
     EpisodeDecision,
+    LeadingStillnessConfig,
+    LeadingStillnessResult,
+    LeadingStillnessTrimmer,
     STANDARD_COLLECTION_INTERACTION,
     TimedSample,
     normalize_collection_start,
@@ -59,10 +63,14 @@ from .task_registry import (
 __all__ = [
     "ArtifactValidation",
     "CollectionInteraction",
+    "CollectionResetPolicy",
     "EpisodeDecision",
     "EvaluationPlan",
     "EvaluationProgress",
     "EvaluationSlot",
+    "LeadingStillnessConfig",
+    "LeadingStillnessResult",
+    "LeadingStillnessTrimmer",
     "OutputDirectoryTransaction",
     "PublishedOutputCleanupError",
     "STANDARD_COLLECTION_INTERACTION",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hmac
 import json
 import secrets
+import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -26,6 +27,7 @@ class OperatorPanelApplication:
         validate_panel_catalog(adapter.catalog())
         self.token = secrets.token_urlsafe(32)
         self.workflow = WorkflowProcess(Path(adapter.repo_root))
+        self._mutation_lock = threading.RLock()
 
     def catalog(self) -> JsonObject:
         return validate_panel_catalog(self.adapter.catalog())
@@ -41,16 +43,18 @@ class OperatorPanelApplication:
         values = payload.get("values", {})
         if not isinstance(workflow, str) or not isinstance(values, dict):
             raise ValueError("start requires workflow and values")
-        return self.workflow.start(self.adapter.build_launch(workflow, values))
+        with self._mutation_lock:
+            return self.workflow.start(self.adapter.build_launch(workflow, values))
 
     def create_config(self, payload: JsonObject) -> JsonObject:
         provider = self.adapter.capabilities.configuration
         if provider is None:
             raise _CapabilityUnavailable("configuration")
-        if self.workflow.snapshot()["active"]:
-            raise RuntimeError("cannot create a configuration while a workflow is active")
-        result = provider.create_config(payload)
-        return {**result, "catalog": self.catalog()}
+        with self._mutation_lock:
+            if self.workflow.snapshot()["active"]:
+                raise RuntimeError("cannot create a configuration while a workflow is active")
+            result = provider.create_config(payload)
+            return {**result, "catalog": self.catalog()}
 
     def config_template(self, payload: JsonObject) -> JsonObject:
         provider = self.adapter.capabilities.configuration
@@ -68,14 +72,15 @@ class OperatorPanelApplication:
         provider = self.adapter.capabilities.registration
         if provider is None:
             raise _CapabilityUnavailable("registration")
-        if self.workflow.snapshot()["active"]:
-            raise RuntimeError("cannot register repository data while a workflow is active")
-        registration = payload.get("registration")
-        values = payload.get("values", {})
-        if not isinstance(registration, str) or not isinstance(values, dict):
-            raise ValueError("register requires a registration id and values")
-        result = provider.register(registration, values)
-        return {**result, "catalog": self.catalog()}
+        with self._mutation_lock:
+            if self.workflow.snapshot()["active"]:
+                raise RuntimeError("cannot register repository data while a workflow is active")
+            registration = payload.get("registration")
+            values = payload.get("values", {})
+            if not isinstance(registration, str) or not isinstance(values, dict):
+                raise ValueError("register requires a registration id and values")
+            result = provider.register(registration, values)
+            return {**result, "catalog": self.catalog()}
 
 
 class _CapabilityUnavailable(LookupError):
@@ -122,7 +127,7 @@ def serve_operator_panel(
 
 def _handler_type(app: OperatorPanelApplication, asset_root: Path) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
-        server_version = "OperatorPanel/1"
+        server_version = "OperatorPanel/2"
 
         def do_GET(self) -> None:  # noqa: N802
             path = urlsplit(self.path).path
@@ -140,6 +145,9 @@ def _handler_type(app: OperatorPanelApplication, asset_root: Path) -> type[BaseH
                 return
             if path == "/panel.js":
                 self._send_asset("panel.js", "text/javascript; charset=utf-8")
+                return
+            if path.startswith("/assets/"):
+                self._send_packaged_asset(path.removeprefix("/"))
                 return
             if path == "/api/catalog":
                 self._send_json(HTTPStatus.OK, app.catalog())
@@ -211,6 +219,25 @@ def _handler_type(app: OperatorPanelApplication, asset_root: Path) -> type[BaseH
                 content_type,
             )
 
+        def _send_packaged_asset(self, relative: str) -> None:
+            candidate = (asset_root / relative).resolve()
+            try:
+                candidate.relative_to(asset_root)
+            except ValueError:
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
+                return
+            content_types = {
+                ".woff2": "font/woff2",
+                ".woff": "font/woff",
+                ".svg": "image/svg+xml",
+                ".png": "image/png",
+            }
+            content_type = content_types.get(candidate.suffix.lower())
+            if content_type is None or not candidate.is_file():
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
+                return
+            self._send_bytes(HTTPStatus.OK, candidate.read_bytes(), content_type)
+
         def _send_json(self, status: HTTPStatus, payload: Any) -> None:
             self._send_bytes(
                 status,
@@ -236,7 +263,7 @@ def _handler_type(app: OperatorPanelApplication, asset_root: Path) -> type[BaseH
                 self.send_header(
                     "Content-Security-Policy",
                     "default-src 'self'; img-src 'self' http:; "
-                    "script-src 'self'; style-src 'self'; connect-src 'self'; "
+                    "script-src 'self'; style-src 'self'; font-src 'self' data:; connect-src 'self'; "
                     "frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
                 )
             self.end_headers()

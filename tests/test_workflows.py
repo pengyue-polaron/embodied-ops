@@ -11,8 +11,11 @@ from types import SimpleNamespace
 import pytest
 
 from embodied_ops import (
+    CollectionResetPolicy,
     EpisodeDecision,
     EvaluationPlan,
+    LeadingStillnessConfig,
+    LeadingStillnessTrimmer,
     OutputDirectoryTransaction,
     PublishedOutputCleanupError,
     STANDARD_COLLECTION_INTERACTION,
@@ -58,6 +61,63 @@ def test_console_has_stable_machine_readable_levels_and_run_status(monkeypatch) 
     status.update("hidden by throttle")
     status.update("ready")
     assert output.getvalue().splitlines() == ["[RUN] starting", "[RUN] ready"]
+
+
+def test_collection_reset_policy_has_one_cross_robot_lifecycle_contract() -> None:
+    policy = CollectionResetPolicy(
+        before_collection=True,
+        after_save=True,
+        after_discard=False,
+    )
+
+    assert policy.before_collection is True
+    assert policy.required_after(EpisodeDecision.SAVE) is True
+    assert policy.required_after(EpisodeDecision.DISCARD) is False
+    assert policy.required_after(EpisodeDecision.QUIT) is False
+
+
+def test_leading_stillness_trimmer_emits_preroll_after_sustained_motion() -> None:
+    trimmer = LeadingStillnessTrimmer[str](
+        LeadingStillnessConfig(
+            enabled=True,
+            action_thresholds=(0.5, 0.1),
+            reference_frames=2,
+            motion_frames=2,
+            preroll_frames=1,
+        )
+    )
+
+    assert trimmer.push("reference-0", (0.0, 0.0)) == ()
+    assert trimmer.push("reference-1", (0.1, 0.0)) == ()
+    assert trimmer.push("still", (0.2, 0.0)) == ()
+    assert trimmer.push("noise", (0.56, 0.0)) == ()
+    assert trimmer.push("still-again", (0.2, 0.0)) == ()
+    assert trimmer.push("motion-0", (0.7, 0.0)) == ()
+    assert trimmer.push("motion-1", (0.8, 0.0)) == (
+        "still-again",
+        "motion-0",
+        "motion-1",
+    )
+    assert trimmer.push("running", (0.9, 0.0)) == ("running",)
+    assert trimmer.result.started is True
+    assert trimmer.result.seen_frames == 8
+    assert trimmer.result.emitted_frames == 4
+    assert trimmer.result.trimmed_frames == 4
+
+
+def test_leading_stillness_trimmer_rejects_action_contract_drift() -> None:
+    trimmer = LeadingStillnessTrimmer[object](
+        LeadingStillnessConfig(
+            enabled=True,
+            action_thresholds=(0.1,),
+            reference_frames=1,
+            motion_frames=1,
+            preroll_frames=0,
+        )
+    )
+
+    with pytest.raises(ValueError, match="action length"):
+        trimmer.push(object(), (0.0, 1.0))
 
 
 def test_contract_digest_and_exact_validation_are_canonical() -> None:
