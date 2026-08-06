@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import re
 from typing import Any
 
@@ -18,6 +19,123 @@ _TOP_LEVEL_KEYS = {
     "configuration_types",
     "configuration_groups",
 }
+
+_CORE_WORKFLOW_ORDER = (
+    "hardware",
+    "collect",
+    "reset",
+    "dataset-doctor",
+    "export-v21",
+)
+_CORE_WORKFLOW_COPY = {
+    "hardware": {
+        "label": "Hardware",
+        "eyebrow": "READINESS",
+        "title": "Check hardware",
+        "description": "Check configured robot and camera readiness without moving the robot.",
+        "submit_label": "Run hardware check",
+    },
+    "collect": {
+        "label": "Collect",
+        "eyebrow": "DATA COLLECTION",
+        "title": "Collect episodes",
+        "description": (
+            "Reset before capture, record into the canonical LeRobot dataset, trim "
+            "leading stillness, and reset after each episode."
+        ),
+        "submit_label": "Start collection",
+    },
+    "reset": {
+        "label": "Reset",
+        "eyebrow": "RESET",
+        "title": "Reset robot",
+        "description": "Move the robot to its tracked collection start state.",
+        "submit_label": "Run reset",
+        "tone": "danger",
+    },
+    "dataset-doctor": {
+        "label": "Dataset doctor",
+        "eyebrow": "DATASET",
+        "title": "Inspect canonical data",
+        "description": "Validate episodes, frames, tasks, metadata, and referenced media.",
+        "submit_label": "Run doctor",
+    },
+    "export-v21": {
+        "label": "Export v2.1",
+        "eyebrow": "DATASET",
+        "title": "Export LeRobot v2.1",
+        "description": "Build a tracked LeRobot v2.1 derivative from canonical data.",
+        "submit_label": "Export dataset",
+    },
+}
+
+
+def standard_panel_product(brand: str) -> dict[str, str]:
+    """Return the shared product identity used by every robot adapter."""
+
+    return {"brand": _text(brand, "product brand"), "title": "Operator Panel"}
+
+
+def standard_camera_controls(*, stop_confirm: str) -> list[dict[str, Any]]:
+    """Return the common lifecycle controls for persistent camera previews."""
+
+    return [
+        {
+            "label": "Start cameras",
+            "workflow": "camera",
+            "values": {"action": "start"},
+        },
+        {
+            "label": "Stop cameras",
+            "workflow": "camera",
+            "values": {"action": "stop"},
+            "tone": "danger",
+            "confirm": _text(stop_confirm, "camera stop confirmation"),
+        },
+    ]
+
+
+def standard_core_workflows(
+    *,
+    hardware_fields: list[dict[str, Any]],
+    collect_fields: list[dict[str, Any]],
+    reset_fields: list[dict[str, Any]],
+    dataset_fields: list[dict[str, Any]],
+    reset_confirm: str,
+) -> list[dict[str, Any]]:
+    """Build the ordered workflow surface shared by all collection robots."""
+
+    fields = {
+        "hardware": hardware_fields,
+        "collect": collect_fields,
+        "reset": reset_fields,
+        "dataset-doctor": dataset_fields,
+        "export-v21": dataset_fields,
+    }
+    workflows = []
+    for workflow_id in _CORE_WORKFLOW_ORDER:
+        workflow = {
+            "id": workflow_id,
+            **_CORE_WORKFLOW_COPY[workflow_id],
+            "fields": deepcopy(fields[workflow_id]),
+        }
+        if workflow_id == "reset":
+            workflow["confirm"] = _text(reset_confirm, "reset confirmation")
+        workflows.append(workflow)
+    return workflows
+
+
+def order_workflow_forms(workflows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep the shared collection journey first and preserve extension order."""
+
+    ranks = {workflow_id: index for index, workflow_id in enumerate(_CORE_WORKFLOW_ORDER)}
+    return [
+        item
+        for _, item in sorted(
+            enumerate(workflows),
+            key=lambda pair: (ranks.get(pair[1].get("id"), len(ranks)), pair[0]),
+        )
+    ]
 
 
 def option(value: str, label: str, *, depends_value: str | None = None) -> dict[str, str]:

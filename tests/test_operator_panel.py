@@ -15,7 +15,11 @@ from embodied_ops.operator_panel import (
     PanelCapabilities,
     RepositoryDocumentStore,
     WorkflowLaunch,
+    option,
     select_field,
+    standard_camera_controls,
+    standard_core_workflows,
+    standard_panel_product,
     text_field,
     normalize_camera_health,
     unavailable_camera_health,
@@ -223,6 +227,49 @@ def test_panel_catalog_schema_standardizes_product_workflows_and_fields() -> Non
     catalog["workflows"][0]["fields"][0]["unknown"] = True
     with pytest.raises(ValueError, match="invalid keys"):
         validate_panel_catalog(catalog)
+
+
+def test_standard_panel_catalog_builders_define_one_core_operator_journey() -> None:
+    config = select_field(
+        "config",
+        "Collection config",
+        [option("configs/collection/default.toml", "default")],
+    )
+    workflows = standard_core_workflows(
+        hardware_fields=[config],
+        collect_fields=[config, text_field("task", "Task prompt", placeholder="pick")],
+        reset_fields=[config],
+        dataset_fields=[config, text_field("experiment", "Experiment", placeholder="run_v1")],
+        reset_confirm="Confirm the workspace is clear before moving the robot?",
+    )
+
+    assert standard_panel_product("Demo Robot") == {
+        "brand": "Demo Robot",
+        "title": "Operator Panel",
+    }
+    assert [workflow["id"] for workflow in workflows] == [
+        "hardware",
+        "collect",
+        "reset",
+        "dataset-doctor",
+        "export-v21",
+    ]
+    assert [workflow["label"] for workflow in workflows] == [
+        "Hardware",
+        "Collect",
+        "Reset",
+        "Dataset doctor",
+        "Export v2.1",
+    ]
+    assert workflows[2]["tone"] == "danger"
+    assert workflows[3]["fields"] is not workflows[4]["fields"]
+    assert standard_camera_controls(stop_confirm="Stop previews?")[1] == {
+        "label": "Stop cameras",
+        "workflow": "camera",
+        "values": {"action": "stop"},
+        "tone": "danger",
+        "confirm": "Stop previews?",
+    }
 
 
 def test_camera_health_contract_is_normalized() -> None:
