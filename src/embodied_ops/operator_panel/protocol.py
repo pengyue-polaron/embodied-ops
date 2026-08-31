@@ -14,6 +14,8 @@ from typing import TypeAlias
 
 
 PROTOCOL_ENV = "OPERATOR_PANEL_PROTOCOL"
+PROTOCOL_VERSION_ENV = "OPERATOR_PANEL_PROTOCOL_VERSION"
+PANEL_EVENT_SCHEMA_VERSION = 1
 _PROTOCOL_PREFIX = "@@OPERATOR_PANEL "
 _PROGRESS_ID = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 _PROGRESS_MIN_INTERVAL_S = 0.25
@@ -56,7 +58,7 @@ def announce_input(actions: Iterable[str]) -> None:
         return
     normalized = _normalize_actions(actions)
     print(
-        _PROTOCOL_PREFIX + json.dumps({"input": normalized}, separators=(",", ":")),
+        _PROTOCOL_PREFIX + _encode_event({"input": normalized}),
         flush=True,
     )
 
@@ -85,11 +87,7 @@ def announce_progress(
             "detail": detail,
         }
     )
-    payload = json.dumps(
-        {"progress": event.as_json()},
-        separators=(",", ":"),
-        ensure_ascii=False,
-    )
+    payload = _encode_event({"progress": event.as_json()})
     now = time.monotonic()
     with _progress_lock:
         previous = _last_progress.get(progress_id)
@@ -115,14 +113,20 @@ def parse_event(line: str) -> PanelEvent | None:
         return InvalidEvent("invalid JSON")
     if not isinstance(payload, dict):
         return InvalidEvent("event must be an object")
+    if set(payload) == {"schema_version", "event"}:
+        if payload["schema_version"] != PANEL_EVENT_SCHEMA_VERSION:
+            return InvalidEvent("unsupported event schema version")
+        payload = payload["event"]
+        if not isinstance(payload, dict):
+            return InvalidEvent("versioned event payload must be an object")
     if set(payload) == {"input"}:
         actions = payload["input"]
         if not isinstance(actions, list):
-            return InputEvent(())
+            return InvalidEvent("input actions must be a list")
         try:
             return InputEvent(_normalize_actions(actions))
-        except ValueError:
-            return InputEvent(())
+        except ValueError as exc:
+            return InvalidEvent(str(exc))
     if set(payload) == {"progress"}:
         try:
             return _progress_event(payload["progress"])
@@ -186,3 +190,11 @@ def _normalize_actions(actions: Iterable[str]) -> tuple[str, ...]:
     if len(set(values)) != len(values):
         raise ValueError("operator-panel input actions must not contain duplicates")
     return values
+
+
+def _encode_event(event: dict[str, object]) -> str:
+    return json.dumps(
+        {"schema_version": PANEL_EVENT_SCHEMA_VERSION, "event": event},
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )

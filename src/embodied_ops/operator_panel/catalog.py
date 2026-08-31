@@ -253,6 +253,99 @@ def validate_panel_catalog(value: object) -> dict[str, Any]:
     return catalog
 
 
+def validate_workflow_submission(
+    catalog: object,
+    workflow_id: object,
+    values: object,
+) -> dict[str, Any]:
+    """Validate one workflow or declared camera-control submission."""
+
+    validated = validate_panel_catalog(catalog)
+    identity = _identifier(workflow_id, "workflow id")
+    submitted = _object(values, f"workflow {identity!r} values")
+    for raw_form in validated["workflows"]:
+        form = _object(raw_form, "workflow form")
+        if form["id"] == identity:
+            return _validate_submission_values(form, submitted, f"workflow {identity!r}")
+    matching_controls = [
+        _object(item, "camera control")
+        for item in validated["camera_controls"]
+        if _object(item, "camera control")["workflow"] == identity
+    ]
+    if any(control["values"] == submitted for control in matching_controls):
+        return dict(submitted)
+    if matching_controls:
+        raise ValueError(f"workflow {identity!r} values do not match a declared camera control")
+    raise ValueError(f"unknown workflow: {identity!r}")
+
+
+def validate_registration_submission(
+    catalog: object,
+    registration_id: object,
+    values: object,
+) -> dict[str, Any]:
+    """Validate one registration submission against its declared form."""
+
+    validated = validate_panel_catalog(catalog)
+    identity = _identifier(registration_id, "registration id")
+    submitted = _object(values, f"registration {identity!r} values")
+    for raw_form in validated["registrations"]:
+        form = _object(raw_form, "registration form")
+        if form["id"] == identity:
+            return _validate_submission_values(
+                form,
+                submitted,
+                f"registration {identity!r}",
+            )
+    raise ValueError(f"unknown registration: {identity!r}")
+
+
+def _validate_submission_values(
+    form: dict[str, Any],
+    values: dict[str, Any],
+    label: str,
+) -> dict[str, Any]:
+    fields = {field["name"]: _object(field, f"{label} field") for field in form["fields"]}
+    unknown = sorted(set(values) - set(fields))
+    if unknown:
+        raise ValueError(f"{label} has unknown values: {unknown}")
+
+    normalized: dict[str, Any] = {}
+    for name, field in fields.items():
+        if name in values:
+            value = values[name]
+        elif "default" in field:
+            value = field["default"]
+        elif field.get("required", field["type"] != "checkbox"):
+            raise ValueError(f"{label} is missing required value: {name!r}")
+        else:
+            continue
+
+        field_type = field["type"]
+        if field_type == "checkbox":
+            _boolean(value, f"{label} value {name!r}")
+        else:
+            if not isinstance(value, str) or value != value.strip():
+                raise ValueError(f"{label} value {name!r} must be text without surrounding space")
+            if field.get("required", True) and not value:
+                raise ValueError(f"{label} value {name!r} must not be empty")
+            if field_type == "select":
+                available = [
+                    option["value"]
+                    for option in field["options"]
+                    if "depends_on" not in field
+                    or option.get("depends_value")
+                    == normalized.get(
+                        field["depends_on"],
+                        values.get(field["depends_on"]),
+                    )
+                ]
+                if value not in available:
+                    raise ValueError(f"{label} value {name!r} is not an available select option")
+        normalized[name] = value
+    return normalized
+
+
 def _validate_camera(value: object, label: str) -> None:
     camera = _object(value, label)
     allowed = {"id", "label", "url", "port", "path"}

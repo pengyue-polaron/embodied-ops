@@ -22,7 +22,12 @@ announcement. Long-running work may call `announce_progress()` with a stable id,
 label, current value, optional total, phase, and concise detail. The supervisor
 keeps only the latest value for each id, so progress refreshes do not pollute the
 durable terminal history. These events are presentation-only and cannot grant
-input or launch work.
+input or launch work. Emitted event lines use the versioned
+`{"schema_version": 1, "event": ...}` envelope; the parser continues to accept
+the original unversioned input and progress shapes for existing consumers but
+rejects malformed events explicitly. Workflow status responses are independently
+versioned and include a stable `run_id`, monotonic `revision`, lifecycle `state`,
+and start/finish timestamps so non-Web consumers can mirror them safely.
 
 Consumers implement the `PanelAdapter` methods and pass the adapter to
 `serve_operator_panel(adapter, bind=..., port=...)`. Workflow forms,

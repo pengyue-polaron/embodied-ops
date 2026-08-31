@@ -12,7 +12,11 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from .catalog import validate_panel_catalog
+from .catalog import (
+    validate_panel_catalog,
+    validate_registration_submission,
+    validate_workflow_submission,
+)
 from .contracts import JsonObject, PanelAdapter
 from .process import WorkflowProcess
 
@@ -41,8 +45,7 @@ class OperatorPanelApplication:
     def start(self, payload: JsonObject) -> JsonObject:
         workflow = payload.get("workflow")
         values = payload.get("values", {})
-        if not isinstance(workflow, str) or not isinstance(values, dict):
-            raise ValueError("start requires workflow and values")
+        values = validate_workflow_submission(self.catalog(), workflow, values)
         with self._mutation_lock:
             return self.workflow.start(self.adapter.build_launch(workflow, values))
 
@@ -77,8 +80,11 @@ class OperatorPanelApplication:
                 raise RuntimeError("cannot register repository data while a workflow is active")
             registration = payload.get("registration")
             values = payload.get("values", {})
-            if not isinstance(registration, str) or not isinstance(values, dict):
-                raise ValueError("register requires a registration id and values")
+            values = validate_registration_submission(
+                self.catalog(),
+                registration,
+                values,
+            )
             result = provider.register(registration, values)
             return {**result, "catalog": self.catalog()}
 
@@ -108,20 +114,13 @@ def serve_operator_panel(
     else:
         print(f"[PASS] Operator Panel: http://{bind}:{port}", flush=True)
     try:
-        while True:
-            try:
-                server.serve_forever()
-            except KeyboardInterrupt:
-                if not app.workflow.snapshot()["active"]:
-                    break
-                try:
-                    app.workflow.stop()
-                except RuntimeError as exc:
-                    print(f"[FAIL] {exc}; panel remains available.", flush=True)
-                    continue
-                break
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
     finally:
         server.server_close()
+        if app.workflow.snapshot()["active"]:
+            app.workflow.stop()
     return 0
 
 

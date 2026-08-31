@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import time
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -12,9 +13,12 @@ from embodied_ops.operator_panel import (
     InvalidEvent,
     OperatorPanelApplication,
     PANEL_CATALOG_SCHEMA_VERSION,
+    PANEL_EVENT_SCHEMA_VERSION,
     PanelCapabilities,
     RepositoryDocumentStore,
     WorkflowLaunch,
+    WORKFLOW_STATUS_SCHEMA_VERSION,
+    announce_input,
     option,
     select_field,
     standard_camera_controls,
@@ -26,6 +30,7 @@ from embodied_ops.operator_panel import (
     parse_event,
     strip_protocol_events,
     validate_panel_catalog,
+    validate_workflow_submission,
 )
 from embodied_ops.operator_panel.process import WorkflowProcess
 
@@ -39,7 +44,7 @@ def test_workflow_process_accepts_one_announced_input(tmp_path: Path) -> None:
             sys.executable,
             "-u",
             "-c",
-            'print(\'@@OPERATOR_PANEL {"input":["enter"]}\'); '
+            'print(\'@@OPERATOR_PANEL {"input":["unknown","enter"]}\'); '
             "input(); print('workflow complete')",
         ),
         input_actions=(InputAction("enter", "Next", "\n", "primary"),),
@@ -49,7 +54,14 @@ def test_workflow_process_accepts_one_announced_input(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="already active"):
         process.start(launch)
     status = _wait_for(process, lambda value: bool(value["input_actions"]))
+    revision = status["revision"]
+    assert status["schema_version"] == WORKFLOW_STATUS_SCHEMA_VERSION
+    assert status["run_id"]
+    assert status["state"] == "waiting_for_input"
     assert status["input_actions"] == [{"id": "enter", "label": "Next", "tone": "primary"}]
+    assert any(
+        "undeclared operator-panel input actions: unknown" in line for line in status["logs"]
+    )
     process.send("enter")
     with pytest.raises(RuntimeError, match="not waiting"):
         process.send("enter")
@@ -59,6 +71,9 @@ def test_workflow_process_accepts_one_announced_input(tmp_path: Path) -> None:
         lambda value: not value["active"] and "workflow complete" in value["logs"],
     )
     assert status["exit_code"] == 0
+    assert status["state"] == "succeeded"
+    assert status["finished_at"]
+    assert status["revision"] > revision
 
 
 def test_workflow_process_separates_progress_and_live_status_from_logs(
@@ -74,6 +89,7 @@ def test_workflow_process_separates_progress_and_live_status_from_logs(
             "-c",
             "import os, time; "
             "assert os.environ['OPERATOR_PANEL_PROTOCOL'] == '1'; "
+            "assert os.environ['OPERATOR_PANEL_PROTOCOL_VERSION'] == '1'; "
             'print(\'@@OPERATOR_PANEL {"progress":{"id":"inference",\''
             '\'"label":"Inference","current":2,"total":4,\''
             '\'"phase":"EXECUTE","detail":"action 8/16"}}\'); '
@@ -106,6 +122,39 @@ def test_workflow_process_separates_progress_and_live_status_from_logs(
     assert status["status_line"] == ""
 
 
+def test_workflow_process_stops_child_when_panel_owner_disappears(tmp_path: Path) -> None:
+    ready = tmp_path / "ready"
+    stopped = tmp_path / "stopped"
+    child_code = (
+        "import signal, sys, time; from pathlib import Path; "
+        f"ready=Path({str(ready)!r}); stopped=Path({str(stopped)!r}); "
+        "stop=lambda *_: (stopped.write_text('stopped'), sys.exit(0)); "
+        "signal.signal(signal.SIGINT, stop); ready.write_text('ready'); "
+        "deadline=time.monotonic()+5; "
+        'exec("while time.monotonic() < deadline:\\n time.sleep(0.05)")'
+    )
+    owner_code = (
+        "import os, sys, time; from pathlib import Path; "
+        "from embodied_ops.operator_panel import WorkflowLaunch; "
+        "from embodied_ops.operator_panel.process import WorkflowProcess; "
+        f"ready=Path({str(ready)!r}); "
+        f"process=WorkflowProcess(Path({str(tmp_path)!r})); "
+        "process.start(WorkflowLaunch(workflow='test', name='test', "
+        f"command=(sys.executable, '-u', '-c', {child_code!r}))); "
+        "deadline=time.monotonic()+3; "
+        'exec("while not ready.exists() and time.monotonic() < deadline:\\n time.sleep(0.01)"); '
+        "assert ready.exists(); os._exit(0)"
+    )
+
+    result = subprocess.run([sys.executable, "-c", owner_code], check=False)
+
+    assert result.returncode == 0
+    deadline = time.monotonic() + 3.0
+    while not stopped.exists() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert stopped.read_text() == "stopped"
+
+
 def test_protocol_rejects_invalid_progress() -> None:
     event = parse_event(
         '@@OPERATOR_PANEL {"progress":{"id":"inference","label":"Inference",'
@@ -114,6 +163,20 @@ def test_protocol_rejects_invalid_progress() -> None:
 
     assert isinstance(event, InvalidEvent)
     assert event.reason == "progress total must be positive and at least current"
+
+
+def test_protocol_emits_a_versioned_envelope_and_rejects_invalid_input(capsys, monkeypatch) -> None:
+    monkeypatch.setenv("OPERATOR_PANEL_PROTOCOL", "1")
+
+    announce_input(("enter",))
+    line = capsys.readouterr().out.strip()
+
+    assert line.startswith("@@OPERATOR_PANEL ")
+    assert f'"schema_version":{PANEL_EVENT_SCHEMA_VERSION}' in line
+    assert parse_event(line).actions == ("enter",)
+    invalid = parse_event('@@OPERATOR_PANEL {"input":"enter"}')
+    assert isinstance(invalid, InvalidEvent)
+    assert invalid.reason == "input actions must be a list"
 
 
 def test_protocol_events_can_be_removed_without_exposing_the_wire_prefix() -> None:
@@ -227,6 +290,47 @@ def test_panel_catalog_schema_standardizes_product_workflows_and_fields() -> Non
     catalog["workflows"][0]["fields"][0]["unknown"] = True
     with pytest.raises(ValueError, match="invalid keys"):
         validate_panel_catalog(catalog)
+
+
+def test_workflow_submission_is_validated_against_the_declared_form() -> None:
+    catalog = _minimal_catalog()
+    catalog["workflows"] = [
+        {
+            "id": "collect",
+            "label": "Collect",
+            "eyebrow": "DATA",
+            "title": "Collect",
+            "submit_label": "Start",
+            "fields": [
+                select_field(
+                    "config",
+                    "Config",
+                    [{"value": "demo", "label": "Demo"}],
+                    default="demo",
+                ),
+                text_field("task", "Task", placeholder="pick"),
+            ],
+        }
+    ]
+
+    assert validate_workflow_submission(catalog, "collect", {"task": "pick"}) == {
+        "config": "demo",
+        "task": "pick",
+    }
+    with pytest.raises(ValueError, match="unknown values"):
+        validate_workflow_submission(
+            catalog,
+            "collect",
+            {"task": "pick", "unexpected": True},
+        )
+    with pytest.raises(ValueError, match="available select option"):
+        validate_workflow_submission(
+            catalog,
+            "collect",
+            {"config": "other", "task": "pick"},
+        )
+    with pytest.raises(ValueError, match="missing required"):
+        validate_workflow_submission(catalog, "collect", {})
 
 
 def test_standard_panel_catalog_builders_define_one_core_operator_journey() -> None:

@@ -7,19 +7,26 @@ import shlex
 import signal
 import subprocess
 import threading
+import uuid
 from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from .contracts import InputAction, WorkflowLaunch
+from .owned_process import owned_command
 from .protocol import (
+    PANEL_EVENT_SCHEMA_VERSION,
     PROTOCOL_ENV,
+    PROTOCOL_VERSION_ENV,
     InputEvent,
     InvalidEvent,
     ProgressEvent,
     parse_event,
 )
+
+
+WORKFLOW_STATUS_SCHEMA_VERSION = 1
 
 
 class WorkflowProcess:
@@ -31,8 +38,12 @@ class WorkflowProcess:
         self._workflow = ""
         self._name = ""
         self._command: tuple[str, ...] = ()
+        self._run_id = ""
+        self._revision = 0
         self._started_at = ""
+        self._finished_at = ""
         self._exit_code: int | None = None
+        self._stop_requested = False
         self._logs: deque[str] = deque(maxlen=max_log_lines)
         self._status_line = ""
         self._progress: dict[str, ProgressEvent] = {}
@@ -59,10 +70,16 @@ class WorkflowProcess:
                     "NO_COLOR": "1",
                     "PYTHONUNBUFFERED": "1",
                     PROTOCOL_ENV: "1",
+                    PROTOCOL_VERSION_ENV: str(PANEL_EVENT_SCHEMA_VERSION),
                 }
             )
-            process = subprocess.Popen(
+            supervised_command, owner_environment = owned_command(
                 launch.command,
+                owner_pid=os.getpid(),
+            )
+            environment.update(owner_environment)
+            process = subprocess.Popen(
+                supervised_command,
                 cwd=self.repo_root,
                 env=environment,
                 stdin=subprocess.PIPE,
@@ -76,8 +93,12 @@ class WorkflowProcess:
             self._workflow = launch.workflow
             self._name = launch.name
             self._command = launch.command
+            self._run_id = str(uuid.uuid4())
+            self._revision = 1
             self._started_at = datetime.now(timezone.utc).isoformat()
+            self._finished_at = ""
             self._exit_code = None
+            self._stop_requested = False
             self._logs.clear()
             self._logs.append(f"[PANEL] started {launch.name}")
             self._logs.append(f"[PANEL] command {shlex.join(launch.command)}")
@@ -112,6 +133,7 @@ class WorkflowProcess:
                 self._available_input = previous
                 raise RuntimeError("active workflow closed its input channel") from exc
             self._logs.append(f"[PANEL] input {action_id}")
+            self._revision += 1
             return self._snapshot_locked()
 
     def stop(self, *, timeout_s: float = 12.0) -> dict[str, Any]:
@@ -121,6 +143,8 @@ class WorkflowProcess:
                 return self._snapshot_locked()
             self._logs.append("[PANEL] interrupt requested")
             self._available_input = ()
+            self._stop_requested = True
+            self._revision += 1
         try:
             os.killpg(process.pid, signal.SIGINT)
         except ProcessLookupError:
@@ -134,7 +158,7 @@ class WorkflowProcess:
                 "command before retrying"
             ) from exc
         with self._lock:
-            self._exit_code = process.returncode
+            self._finalize_locked(process.returncode)
             return self._snapshot_locked()
 
     def snapshot(self) -> dict[str, Any]:
@@ -150,33 +174,46 @@ class WorkflowProcess:
                 if self._process is not process:
                     continue
                 if isinstance(event, InputEvent):
+                    unknown = tuple(
+                        action_id
+                        for action_id in event.actions
+                        if action_id not in self._input_actions
+                    )
                     self._available_input = tuple(
                         action_id for action_id in event.actions if action_id in self._input_actions
                     )
+                    if unknown:
+                        self._logs.append(
+                            "[WARN] Ignored undeclared operator-panel input actions: "
+                            + ", ".join(unknown)
+                        )
+                    self._revision += 1
                     continue
                 if isinstance(event, ProgressEvent):
                     self._progress[event.progress_id] = event
+                    self._revision += 1
                     continue
                 if isinstance(event, InvalidEvent):
                     self._logs.append(
                         f"[WARN] Ignored invalid operator-panel event: {event.reason}"
                     )
+                    self._revision += 1
                     continue
                 if line.startswith("[RUN] "):
                     self._status_line = line
+                    self._revision += 1
                     continue
                 if self._status_line and not line.strip():
                     self._status_line = ""
+                    self._revision += 1
                     continue
                 self._status_line = ""
                 self._logs.append(line)
+                self._revision += 1
         return_code = process.wait()
         with self._lock:
             if self._process is process:
-                self._exit_code = return_code
-                self._available_input = ()
-                self._status_line = ""
-                self._logs.append(f"[PANEL] exited {return_code}")
+                self._finalize_locked(return_code)
 
     def _is_active_locked(self) -> bool:
         return self._process is not None and self._process.poll() is None
@@ -184,14 +221,19 @@ class WorkflowProcess:
     def _snapshot_locked(self) -> dict[str, Any]:
         active = self._is_active_locked()
         if self._process is not None and not active:
-            self._exit_code = self._process.returncode
-            self._available_input = ()
+            self._finalize_locked(self._process.returncode)
+        state = self._state_locked(active)
         return {
+            "schema_version": WORKFLOW_STATUS_SCHEMA_VERSION,
+            "revision": self._revision,
+            "run_id": self._run_id,
+            "state": state,
             "active": active,
             "workflow": self._workflow,
             "name": self._name,
             "command": list(self._command),
             "started_at": self._started_at,
+            "finished_at": self._finished_at,
             "exit_code": self._exit_code,
             "progress": [
                 self._progress[progress_id].as_json() for progress_id in sorted(self._progress)
@@ -207,3 +249,28 @@ class WorkflowProcess:
             ],
             "logs": list(self._logs),
         }
+
+    def _finalize_locked(self, return_code: int | None) -> None:
+        if self._exit_code is not None or return_code is None:
+            return
+        self._exit_code = return_code
+        self._finished_at = datetime.now(timezone.utc).isoformat()
+        self._available_input = ()
+        self._status_line = ""
+        self._logs.append(f"[PANEL] exited {return_code}")
+        self._revision += 1
+
+    def _state_locked(self, active: bool) -> str:
+        if self._process is None:
+            return "idle"
+        if active:
+            if self._stop_requested:
+                return "stopping"
+            if self._available_input:
+                return "waiting_for_input"
+            return "running"
+        if self._stop_requested:
+            return "stopped"
+        if self._exit_code == 0:
+            return "succeeded"
+        return "failed"
