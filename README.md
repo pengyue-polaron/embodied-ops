@@ -11,8 +11,9 @@
 `embodied-ops` defines the reusable operational layer that sits above robot and
 policy adapters: a consistent CLI vocabulary, collection interaction, task
 selection, sample-timing checks, deterministic evaluation, verified artifacts,
-and an adapter-driven local Operator Panel. The core package has no mandatory
-runtime dependencies and does not define a competing robot API.
+and an adapter-driven local Operator Panel with versioned machine-readable
+workflow status. The core package has no mandatory runtime dependencies and
+does not define a competing robot API.
 
 ## Install
 
@@ -35,7 +36,7 @@ python -m pip install "embodied-ops[lerobot-dataset]"
 | Tasks | Strict create-only JSON prompt catalogs and one number/id/exact-prompt selection flow |
 | Evaluation | Stable task/repetition plans, deterministic run slots, and portable progress summaries |
 | Artifacts | Atomic publication, exact manifests, verified Hugging Face retrieval, contract digests, and pinned code environments |
-| Operator Panel | Versioned catalog and form schema, packaged shadcn/ui Web presentation, minimal repository adapters, normalized camera health, exclusive workflow supervision, guarded input, typed progress, and format-driven document creation |
+| Operator Panel | Versioned catalog, form, event, and workflow-status schemas; packaged shadcn/ui Web presentation; minimal repository adapters; normalized camera health; exclusive owned-process supervision; guarded input; typed progress; and format-driven document creation |
 | Dataset interoperability | LeRobot v3 payload-graph validation and a format-only v3-to-v2.1 builder; Runtime callers supply robot task, feature, statistics, and provenance constraints |
 
 The package owns cross-robot operational mechanics only. Robot repositories
@@ -72,6 +73,27 @@ Child processes may announce guarded input and display-only progress through
 `announce_input()` and `announce_progress()`. See
 [`src/embodied_ops/operator_panel/README.md`](src/embodied_ops/operator_panel/README.md)
 for the adapter and presentation contracts.
+
+### Operator status and external observability
+
+`GET /api/status` returns a versioned, read-only workflow snapshot for
+non-Web consumers. Each snapshot carries a stable `run_id`, monotonic
+`revision`, lifecycle state, timestamps, typed progress, and the currently
+accepted guarded-input actions. Lifecycle states are `idle`, `running`,
+`waiting_for_input`, `stopping`, `stopped`, `succeeded`, and `failed`.
+
+A robot integration may validate and sanitize that snapshot before mapping it
+to a native observability transport. For example, Galaxea A1 mirrors workflow
+identity, progress, state, and failures to a read-only ROS topic for Foxglove,
+while deliberately omitting child command arguments and terminal logs. ROS,
+Foxglove, network exposure, and topic policy remain the robot Runtime's
+responsibility; `embodied-ops` does not import or own them. Status is
+observational: the action identifiers it reports do not grant permission to
+send input or start work.
+
+The supervisor owns the launched workflow process group and terminates it if
+the panel server disappears, preventing an apparently stopped control surface
+from leaving its child process running.
 
 The Web source lives under `web/` as a Vite + React + TypeScript application.
 It uses checked-in shadcn/ui components and compiles to the dependency-free

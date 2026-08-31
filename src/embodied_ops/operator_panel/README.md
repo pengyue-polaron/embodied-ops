@@ -29,6 +29,27 @@ rejects malformed events explicitly. Workflow status responses are independently
 versioned and include a stable `run_id`, monotonic `revision`, lifecycle `state`,
 and start/finish timestamps so non-Web consumers can mirror them safely.
 
+## Read-only status integration
+
+`GET /api/status` is the public read-only status endpoint. Consumers must
+validate `schema_version: 1` and treat `(run_id, revision)` as the snapshot
+identity and ordering key. The lifecycle state is one of `idle`, `running`,
+`waiting_for_input`, `stopping`, `stopped`, `succeeded`, or `failed`.
+Progress entries use stable ids, and `input_actions` describes only the exact
+guarded choices currently accepted by the panel.
+
+The complete local response also contains the launched command and bounded
+terminal history. Integrations that expose status on a wider telemetry surface
+must construct a validated, allowlisted summary instead of forwarding the
+response verbatim. Reported input-action ids are display-only and confer no
+control authority. This package deliberately defines no ROS, Foxglove, or
+other robot-native transport; each Runtime owns its mapping, access policy,
+and network boundary.
+
+The supervisor owns the complete launched process group. If the panel server
+shuts down while a workflow is active, it stops that group before completing
+server shutdown.
+
 Consumers implement the `PanelAdapter` methods and pass the adapter to
 `serve_operator_panel(adapter, bind=..., port=...)`. Workflow forms,
 select options, cameras, configuration kinds, document format metadata, and
