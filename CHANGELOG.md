@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0
 
 - Add dependency-free, hardware-neutral Cartesian teleoperation contracts and
   geometry helpers proven by ManiSkill and MuJoCo adapters.
@@ -8,6 +8,15 @@
   acknowledged, idempotent DEALER/ROUTER operator commands.
 - Launch the Operator Panel process-group supervisor by its installed path so
   workflows do not emit a `runpy` module-preload warning.
+- Add semantic input phase/detail and an independent input-gate revision to the
+  versioned Operator Panel presentation contract.
+- Require exact run and input revisions for guarded input, and exact run identity
+  for stop, rejecting stale, replayed, and cross-run requests.
+- Expose shared-application HTTP server lifecycle hooks so a robot Runtime can
+  attach a private native control adapter without creating a second workflow
+  owner.
+- Keep schema-1 and unversioned child events readable while emitting schema 2.
+- Pin the Web build's transitive `nanoid` dependency to its patched release.
 
 ## 0.7.0
 

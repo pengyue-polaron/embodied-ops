@@ -9,7 +9,7 @@ semantics across multiple robot integrations. It is not a universal robot API.
 | Layer | `embodied-ops` owns | Robot Runtime owns |
 | --- | --- | --- |
 | Operator workflow | CLI levels, check/dataset result presentation, collection decisions and summaries, task selection, evaluation plans, Panel schemas and supervision | Available commands, readiness gates, workflow composition and hardware decisions |
-| Operational status | Versioned workflow snapshots, lifecycle states, revisions, guarded-input visibility, and owned-process termination | Native telemetry mapping, field sanitization, network exposure, and any control transport |
+| Operational status | Versioned workflow snapshots, lifecycle states, run/input revisions, phase-aware guarded-input visibility, stale/replay rejection, and owned-process termination | Native telemetry mapping, field sanitization, network exposure, action allowlists, and any control transport |
 | Artifacts | Atomic publication, digests, verified provider retrieval and pinned code environments | Artifact identity, model policy, credentials and retention |
 | Timing | Freshness, pair-skew and portable progress contracts | Sensor clocks, capture ownership and acceptable limits |
 | Cartesian teleoperation | Source-neutral target/feedback/command schemas, frame geometry, latest-state transport, idempotent command acknowledgement, and a configurable dropout/reacquisition guard | Device protocol, calibration, guard thresholds, native action mapping, workspace/physical safety policy, cameras, and recording |
@@ -42,9 +42,11 @@ their Runtime repository.
 The Operator Panel's read-only status endpoint is a presentation contract, not
 a robot transport. A Runtime may validate and map an allowlisted subset into
 ROS, Foxglove, or another native observability system, but it owns that mapping
-and must not treat reported input actions as control authority. Command
-arguments and terminal history require deliberate sanitization before wider
-exposure.
+and must not treat reported input actions as control authority. If the Runtime
+also maps native controls back into the shared application, every input must
+carry the current run id and input-gate revision and still pass the declared
+action check. Command arguments and terminal history require deliberate
+sanitization before wider exposure.
 
 ## Dependency direction
 

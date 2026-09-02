@@ -49,6 +49,27 @@ class OperatorPanelApplication:
         with self._mutation_lock:
             return self.workflow.start(self.adapter.build_launch(workflow, values))
 
+    def input(self, payload: JsonObject) -> JsonObject:
+        if set(payload) != {"action", "run_id", "input_revision"}:
+            raise ValueError("workflow input requires action, run_id, and input_revision")
+        action = payload["action"]
+        run_id = payload["run_id"]
+        input_revision = payload["input_revision"]
+        if not isinstance(action, str) or not isinstance(run_id, str):
+            raise ValueError("workflow action and run_id must be strings")
+        if isinstance(input_revision, bool) or not isinstance(input_revision, int):
+            raise ValueError("workflow input_revision must be an integer")
+        return self.workflow.send(
+            action,
+            run_id=run_id,
+            input_revision=input_revision,
+        )
+
+    def stop(self, payload: JsonObject) -> JsonObject:
+        if set(payload) != {"run_id"} or not isinstance(payload["run_id"], str):
+            raise ValueError("workflow stop requires a string run_id")
+        return self.workflow.stop(run_id=payload["run_id"])
+
     def create_config(self, payload: JsonObject) -> JsonObject:
         provider = self.adapter.capabilities.configuration
         if provider is None:
@@ -101,9 +122,44 @@ def serve_operator_panel(
     asset_root: Path = ASSET_ROOT,
 ) -> int:
     app = OperatorPanelApplication(adapter)
+    return serve_operator_panel_application(
+        app,
+        bind=bind,
+        port=port,
+        asset_root=asset_root,
+    )
+
+
+def create_operator_panel_server(
+    app: OperatorPanelApplication,
+    *,
+    bind: str = "127.0.0.1",
+    port: int = 8765,
+    asset_root: Path = ASSET_ROOT,
+) -> ThreadingHTTPServer:
+    """Create an HTTP server around an existing workflow owner."""
+
     handler = _handler_type(app, asset_root.resolve())
     server = ThreadingHTTPServer((bind, port), handler)
     server.daemon_threads = True
+    return server
+
+
+def serve_operator_panel_application(
+    app: OperatorPanelApplication,
+    *,
+    bind: str = "127.0.0.1",
+    port: int = 8765,
+    asset_root: Path = ASSET_ROOT,
+) -> int:
+    """Serve an existing application so another local surface may share it."""
+
+    server = create_operator_panel_server(
+        app,
+        bind=bind,
+        port=port,
+        asset_root=asset_root,
+    )
     print("[INFO] Operator Panel is adapter-driven.", flush=True)
     if bind == "0.0.0.0":
         print(f"[PASS] Operator Panel local: http://127.0.0.1:{port}", flush=True)
@@ -174,9 +230,9 @@ def _handler_type(app: OperatorPanelApplication, asset_root: Path) -> type[BaseH
                 if path == "/api/start":
                     result = app.start(payload)
                 elif path == "/api/input":
-                    result = app.workflow.send(str(payload.get("action", "")))
+                    result = app.input(payload)
                 elif path == "/api/stop":
-                    result = app.workflow.stop()
+                    result = app.stop(payload)
                 elif path == "/api/config/template":
                     result = app.config_template(payload)
                 elif path == "/api/config/validate":

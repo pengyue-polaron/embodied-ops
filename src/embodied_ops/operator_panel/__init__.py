@@ -40,7 +40,12 @@ from .protocol import (
     strip_protocol_events,
 )
 from .process import WORKFLOW_STATUS_SCHEMA_VERSION
-from .server import OperatorPanelApplication, serve_operator_panel
+from .server import (
+    OperatorPanelApplication,
+    create_operator_panel_server,
+    serve_operator_panel,
+    serve_operator_panel_application,
+)
 
 __all__ = [
     "CameraProvider",
@@ -62,12 +67,14 @@ __all__ = [
     "announce_progress",
     "checkbox_field",
     "combobox_field",
+    "create_operator_panel_server",
     "fetch_camera_health",
     "normalize_camera_health",
     "option",
     "order_workflow_forms",
     "parse_event",
     "serve_operator_panel",
+    "serve_operator_panel_application",
     "select_field",
     "standard_camera_controls",
     "standard_core_workflows",

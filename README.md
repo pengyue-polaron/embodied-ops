@@ -39,7 +39,7 @@ python -m pip install "embodied-ops[teleop-zmq]"
 | Tasks | Strict create-only JSON prompt catalogs and one number/id/exact-prompt selection flow |
 | Evaluation | Stable task/repetition plans, deterministic run slots, and portable progress summaries |
 | Artifacts | Atomic publication, exact manifests, verified Hugging Face retrieval, contract digests, and pinned code environments |
-| Operator Panel | Versioned catalog, form, event, and workflow-status schemas; packaged shadcn/ui Web presentation; minimal repository adapters; normalized camera health; exclusive owned-process supervision; guarded input; typed progress; and format-driven document creation |
+| Operator Panel | Versioned catalog, form, event, and workflow-status schemas; packaged shadcn/ui Web presentation; minimal repository adapters; normalized camera health; exclusive owned-process supervision; phase-aware revisioned input gates; typed progress; and format-driven document creation |
 | Teleoperation | Source-neutral Cartesian target and action-aligned feedback schemas; lossy latest-state PUB/SUB; acknowledged, idempotent operator commands; shared frame geometry; and a configurable dropout/reacquisition guard |
 | Dataset interoperability | LeRobot v3 payload-graph validation and a format-only v3-to-v2.1 builder; Runtime callers supply robot task, feature, statistics, and provenance constraints |
 
@@ -74,7 +74,9 @@ serve_operator_panel(adapter, bind="127.0.0.1", port=8765)
 ```
 
 Child processes may announce guarded input and display-only progress through
-`announce_input()` and `announce_progress()`. See
+`announce_input()` and `announce_progress()`. Input announcements identify the
+semantic phase and concise operator detail as well as the exact actions accepted
+at that gate. See
 [`src/embodied_ops/operator_panel/README.md`](src/embodied_ops/operator_panel/README.md)
 for the adapter and presentation contracts.
 
@@ -82,8 +84,9 @@ for the adapter and presentation contracts.
 
 `GET /api/status` returns a versioned, read-only workflow snapshot for
 non-Web consumers. Each snapshot carries a stable `run_id`, monotonic
-`revision`, lifecycle state, timestamps, typed progress, and the currently
-accepted guarded-input actions. Lifecycle states are `idle`, `running`,
+`revision`, independent `input_revision`, input phase/detail, lifecycle state,
+timestamps, typed progress, and the currently accepted guarded-input actions.
+Lifecycle states are `idle`, `running`,
 `waiting_for_input`, `stopping`, `stopped`, `succeeded`, and `failed`.
 
 A robot integration may validate and sanitize that snapshot before mapping it
@@ -92,8 +95,16 @@ identity, progress, state, and failures to a read-only ROS topic for Foxglove,
 while deliberately omitting child command arguments and terminal logs. ROS,
 Foxglove, network exposure, and topic policy remain the robot Runtime's
 responsibility; `embodied-ops` does not import or own them. Status is
-observational: the action identifiers it reports do not grant permission to
-send input or start work.
+observational: the action identifiers it reports do not themselves grant
+permission to send input or start work. A robot-specific control adapter must
+submit the exact current `(run_id, input_revision, action)` tuple; stale,
+replayed, undeclared, and cross-run actions are rejected.
+
+Integrations that need one application owner for Web and a private native
+transport can construct `OperatorPanelApplication` directly, expose only their
+allowlisted adapter, and serve the same instance with
+`serve_operator_panel_application()`. Transport authentication, service names,
+and safety policy remain outside this package.
 
 The supervisor owns the launched workflow process group and terminates it if
 the panel server disappears, preventing an apparently stopped control surface

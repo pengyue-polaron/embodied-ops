@@ -17,34 +17,40 @@ structurally consistent while adapters retain robot-specific values.
 Camera health, configuration documents, and structured registration are
 independent providers and may be absent. Child processes call
 `embodied_ops.operator_panel.announce_input()` immediately before an interactive
-prompt; the panel will accept one input and lock the buttons until the next
-announcement. Long-running work may call `announce_progress()` with a stable id,
+prompt, including a semantic `phase` and concise `detail`; the panel will accept
+one input and lock the buttons until the next announcement. Every input request
+must echo the exact current `run_id` and `input_revision`, so stale, replayed,
+or cross-run clicks are rejected. Long-running work may call
+`announce_progress()` with a stable id,
 label, current value, optional total, phase, and concise detail. The supervisor
 keeps only the latest value for each id, so progress refreshes do not pollute the
 durable terminal history. These events are presentation-only and cannot grant
 input or launch work. Emitted event lines use the versioned
-`{"schema_version": 1, "event": ...}` envelope; the parser continues to accept
-the original unversioned input and progress shapes for existing consumers but
+`{"schema_version": 2, "event": ...}` envelope; the parser continues to accept
+schema-1 and original unversioned input/progress shapes for existing children but
 rejects malformed events explicitly. Workflow status responses are independently
-versioned and include a stable `run_id`, monotonic `revision`, lifecycle `state`,
-and start/finish timestamps so non-Web consumers can mirror them safely.
+versioned at schema 2 and include a stable `run_id`, monotonic `revision`,
+independent `input_revision`, input phase/detail, lifecycle `state`, and
+start/finish timestamps so non-Web consumers can mirror them safely.
 
 ## Read-only status integration
 
 `GET /api/status` is the public read-only status endpoint. Consumers must
-validate `schema_version: 1` and treat `(run_id, revision)` as the snapshot
+validate `schema_version: 2` and treat `(run_id, revision)` as the snapshot
 identity and ordering key. The lifecycle state is one of `idle`, `running`,
 `waiting_for_input`, `stopping`, `stopped`, `succeeded`, or `failed`.
-Progress entries use stable ids, and `input_actions` describes only the exact
-guarded choices currently accepted by the panel.
+Progress entries use stable ids. `input_actions`, `input_phase`, and
+`input_detail` describe only the exact current gate; `input_revision` changes
+when a gate opens or is consumed.
 
 The complete local response also contains the launched command and bounded
 terminal history. Integrations that expose status on a wider telemetry surface
 must construct a validated, allowlisted summary instead of forwarding the
 response verbatim. Reported input-action ids are display-only and confer no
-control authority. This package deliberately defines no ROS, Foxglove, or
-other robot-native transport; each Runtime owns its mapping, access policy,
-and network boundary.
+control authority. A native integration may send input only through the same
+application boundary with the exact current `(run_id, input_revision, action)`
+tuple. This package deliberately defines no ROS, Foxglove, or other robot-native
+transport; each Runtime owns its mapping, access policy, and network boundary.
 
 The supervisor owns the complete launched process group. If the panel server
 shuts down while a workflow is active, it stops that group before completing
@@ -59,6 +65,13 @@ the panel; it does not know what a registered record means. Camera presentation
 stays read-only: the camera provider supplies normalized freshness, frame-age,
 preview-rate, and error status without giving the panel direct access to a
 device.
+
+When Web and a robot-native private transport must share one workflow owner,
+construct `OperatorPanelApplication(adapter)` and pass it to
+`serve_operator_panel_application()`. `create_operator_panel_server()` is the
+lower-level lifecycle hook for an integration that already owns its server
+thread. Both paths preserve the same serialized mutations and subprocess
+shutdown behavior.
 
 Workflow fields may use `type: "combobox"` with catalog-provided `options` when
 an operator should be able to select an existing value or type a new one. The

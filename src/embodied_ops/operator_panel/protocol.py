@@ -15,9 +15,11 @@ from typing import TypeAlias
 
 PROTOCOL_ENV = "OPERATOR_PANEL_PROTOCOL"
 PROTOCOL_VERSION_ENV = "OPERATOR_PANEL_PROTOCOL_VERSION"
-PANEL_EVENT_SCHEMA_VERSION = 1
+PANEL_EVENT_SCHEMA_VERSION = 2
+_SUPPORTED_EVENT_SCHEMA_VERSIONS = {1, PANEL_EVENT_SCHEMA_VERSION}
 _PROTOCOL_PREFIX = "@@OPERATOR_PANEL "
 _PROGRESS_ID = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+_INPUT_PHASE = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 _PROGRESS_MIN_INTERVAL_S = 0.25
 _progress_lock = threading.Lock()
 _last_progress: dict[str, tuple[float, str]] = {}
@@ -26,6 +28,8 @@ _last_progress: dict[str, tuple[float, str]] = {}
 @dataclass(frozen=True)
 class InputEvent:
     actions: tuple[str, ...]
+    phase: str = ""
+    detail: str = ""
 
 
 @dataclass(frozen=True)
@@ -51,14 +55,29 @@ class InvalidEvent:
 PanelEvent: TypeAlias = InputEvent | ProgressEvent | InvalidEvent
 
 
-def announce_input(actions: Iterable[str]) -> None:
+def announce_input(
+    actions: Iterable[str],
+    *,
+    phase: str = "",
+    detail: str = "",
+) -> None:
     """Tell a supervising panel which input actions are currently safe."""
 
     if os.environ.get(PROTOCOL_ENV) != "1":
         return
     normalized = _normalize_actions(actions)
+    normalized_phase, normalized_detail = _normalize_input_context(phase, detail)
     print(
-        _PROTOCOL_PREFIX + _encode_event({"input": normalized}),
+        _PROTOCOL_PREFIX
+        + _encode_event(
+            {
+                "input": {
+                    "actions": normalized,
+                    "phase": normalized_phase,
+                    "detail": normalized_detail,
+                }
+            }
+        ),
         flush=True,
     )
 
@@ -113,18 +132,17 @@ def parse_event(line: str) -> PanelEvent | None:
         return InvalidEvent("invalid JSON")
     if not isinstance(payload, dict):
         return InvalidEvent("event must be an object")
+    schema_version: int | None = None
     if set(payload) == {"schema_version", "event"}:
-        if payload["schema_version"] != PANEL_EVENT_SCHEMA_VERSION:
+        schema_version = payload["schema_version"]
+        if schema_version not in _SUPPORTED_EVENT_SCHEMA_VERSIONS:
             return InvalidEvent("unsupported event schema version")
         payload = payload["event"]
         if not isinstance(payload, dict):
             return InvalidEvent("versioned event payload must be an object")
     if set(payload) == {"input"}:
-        actions = payload["input"]
-        if not isinstance(actions, list):
-            return InvalidEvent("input actions must be a list")
         try:
-            return InputEvent(_normalize_actions(actions))
+            return _input_event(payload["input"], schema_version=schema_version)
         except ValueError as exc:
             return InvalidEvent(str(exc))
     if set(payload) == {"progress"}:
@@ -133,6 +151,28 @@ def parse_event(line: str) -> PanelEvent | None:
         except ValueError as exc:
             return InvalidEvent(str(exc))
     return InvalidEvent("unsupported event shape")
+
+
+def _input_event(value: object, *, schema_version: int | None) -> InputEvent:
+    if isinstance(value, list):
+        return InputEvent(_normalize_actions(value))
+    if schema_version != PANEL_EVENT_SCHEMA_VERSION or not isinstance(value, dict):
+        raise ValueError("input actions must be a list")
+    if set(value) != {"actions", "phase", "detail"}:
+        raise ValueError("versioned input event must contain actions, phase, and detail")
+    actions = value["actions"]
+    if not isinstance(actions, list):
+        raise ValueError("input actions must be a list")
+    phase, detail = _normalize_input_context(value["phase"], value["detail"])
+    return InputEvent(_normalize_actions(actions), phase=phase, detail=detail)
+
+
+def _normalize_input_context(phase: object, detail: object) -> tuple[str, str]:
+    if not isinstance(phase, str) or (phase and _INPUT_PHASE.fullmatch(phase) is None):
+        raise ValueError("input phase must be empty or a lowercase identifier")
+    if not isinstance(detail, str) or "\x00" in detail or len(detail.encode("utf-8")) > 1024:
+        raise ValueError("input detail must be text of at most 1024 UTF-8 bytes without NUL")
+    return phase, detail
 
 
 def strip_protocol_events(value: str) -> str:

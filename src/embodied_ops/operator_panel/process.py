@@ -26,7 +26,7 @@ from .protocol import (
 )
 
 
-WORKFLOW_STATUS_SCHEMA_VERSION = 1
+WORKFLOW_STATUS_SCHEMA_VERSION = 2
 
 
 class WorkflowProcess:
@@ -49,6 +49,9 @@ class WorkflowProcess:
         self._progress: dict[str, ProgressEvent] = {}
         self._input_actions: dict[str, InputAction] = {}
         self._available_input: tuple[str, ...] = ()
+        self._input_revision = 0
+        self._input_phase = ""
+        self._input_detail = ""
 
     def start(self, launch: WorkflowLaunch) -> dict[str, Any]:
         with self._lock:
@@ -106,6 +109,9 @@ class WorkflowProcess:
             self._progress.clear()
             self._input_actions = {action.action_id: action for action in launch.input_actions}
             self._available_input = ()
+            self._input_revision = 0
+            self._input_phase = ""
+            self._input_detail = ""
             thread = threading.Thread(
                 target=self._read_output,
                 args=(process,),
@@ -115,34 +121,66 @@ class WorkflowProcess:
             thread.start()
             return self._snapshot_locked()
 
-    def send(self, action_id: str) -> dict[str, Any]:
+    def send(
+        self,
+        action_id: str,
+        *,
+        run_id: str,
+        input_revision: int,
+    ) -> dict[str, Any]:
         with self._lock:
             if not self._is_active_locked() or self._process is None:
                 raise RuntimeError("no active workflow")
+            if run_id != self._run_id:
+                raise RuntimeError("workflow run changed before input was accepted")
+            if (
+                isinstance(input_revision, bool)
+                or not isinstance(input_revision, int)
+                or input_revision != self._input_revision
+            ):
+                raise RuntimeError("workflow input gate changed before input was accepted")
             if action_id not in self._available_input:
                 raise RuntimeError(f"workflow is not waiting for input action: {action_id!r}")
             action = self._input_actions[action_id]
             if self._process.stdin is None:
                 raise RuntimeError("active workflow has no input channel")
             previous = self._available_input
+            previous_phase = self._input_phase
+            previous_detail = self._input_detail
             self._available_input = ()
+            self._input_phase = ""
+            self._input_detail = ""
+            self._input_revision += 1
             try:
                 self._process.stdin.write(action.line)
                 self._process.stdin.flush()
             except (BrokenPipeError, OSError) as exc:
                 self._available_input = previous
+                self._input_phase = previous_phase
+                self._input_detail = previous_detail
+                self._input_revision -= 1
                 raise RuntimeError("active workflow closed its input channel") from exc
             self._logs.append(f"[PANEL] input {action_id}")
             self._revision += 1
             return self._snapshot_locked()
 
-    def stop(self, *, timeout_s: float = 12.0) -> dict[str, Any]:
+    def stop(
+        self,
+        *,
+        run_id: str | None = None,
+        timeout_s: float = 12.0,
+    ) -> dict[str, Any]:
         with self._lock:
             process = self._process
             if process is None or process.poll() is not None:
                 return self._snapshot_locked()
+            if run_id is not None and run_id != self._run_id:
+                raise RuntimeError("workflow run changed before stop was accepted")
             self._logs.append("[PANEL] interrupt requested")
             self._available_input = ()
+            self._input_phase = ""
+            self._input_detail = ""
+            self._input_revision += 1
             self._stop_requested = True
             self._revision += 1
         try:
@@ -182,6 +220,9 @@ class WorkflowProcess:
                     self._available_input = tuple(
                         action_id for action_id in event.actions if action_id in self._input_actions
                     )
+                    self._input_phase = event.phase
+                    self._input_detail = event.detail
+                    self._input_revision += 1
                     if unknown:
                         self._logs.append(
                             "[WARN] Ignored undeclared operator-panel input actions: "
@@ -239,6 +280,9 @@ class WorkflowProcess:
                 self._progress[progress_id].as_json() for progress_id in sorted(self._progress)
             ],
             "status_line": self._status_line,
+            "input_revision": self._input_revision,
+            "input_phase": self._input_phase,
+            "input_detail": self._input_detail,
             "input_actions": [
                 {
                     "id": action_id,
@@ -256,6 +300,9 @@ class WorkflowProcess:
         self._exit_code = return_code
         self._finished_at = datetime.now(timezone.utc).isoformat()
         self._available_input = ()
+        self._input_phase = ""
+        self._input_detail = ""
+        self._input_revision += 1
         self._status_line = ""
         self._logs.append(f"[PANEL] exited {return_code}")
         self._revision += 1

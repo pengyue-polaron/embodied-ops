@@ -58,13 +58,24 @@ def test_workflow_process_accepts_one_announced_input(tmp_path: Path) -> None:
     assert status["schema_version"] == WORKFLOW_STATUS_SCHEMA_VERSION
     assert status["run_id"]
     assert status["state"] == "waiting_for_input"
+    assert status["input_revision"] == 1
     assert status["input_actions"] == [{"id": "enter", "label": "Next", "tone": "primary"}]
     assert any(
         "undeclared operator-panel input actions: unknown" in line for line in status["logs"]
     )
-    process.send("enter")
+    accepted = process.send(
+        "enter",
+        run_id=status["run_id"],
+        input_revision=status["input_revision"],
+    )
+    assert accepted["input_phase"] == ""
+    assert accepted["input_detail"] == ""
     with pytest.raises(RuntimeError, match="not waiting"):
-        process.send("enter")
+        process.send(
+            "enter",
+            run_id=status["run_id"],
+            input_revision=status["input_revision"] + 1,
+        )
 
     status = _wait_for(
         process,
@@ -89,7 +100,8 @@ def test_workflow_process_separates_progress_and_live_status_from_logs(
             "-c",
             "import os, time; "
             "assert os.environ['OPERATOR_PANEL_PROTOCOL'] == '1'; "
-            "assert os.environ['OPERATOR_PANEL_PROTOCOL_VERSION'] == '1'; "
+            f"assert os.environ['OPERATOR_PANEL_PROTOCOL_VERSION'] == "
+            f"'{PANEL_EVENT_SCHEMA_VERSION}'; "
             'print(\'@@OPERATOR_PANEL {"progress":{"id":"inference",\''
             '\'"label":"Inference","current":2,"total":4,\''
             '\'"phase":"EXECUTE","detail":"action 8/16"}}\'); '
@@ -165,18 +177,55 @@ def test_protocol_rejects_invalid_progress() -> None:
     assert event.reason == "progress total must be positive and at least current"
 
 
-def test_protocol_emits_a_versioned_envelope_and_rejects_invalid_input(capsys, monkeypatch) -> None:
+def test_protocol_emits_phase_aware_input_and_accepts_legacy_input(capsys, monkeypatch) -> None:
     monkeypatch.setenv("OPERATOR_PANEL_PROTOCOL", "1")
 
-    announce_input(("enter",))
+    announce_input(("enter",), phase="ready", detail="Episode 2")
     line = capsys.readouterr().out.strip()
 
     assert line.startswith("@@OPERATOR_PANEL ")
     assert f'"schema_version":{PANEL_EVENT_SCHEMA_VERSION}' in line
-    assert parse_event(line).actions == ("enter",)
+    event = parse_event(line)
+    assert event.actions == ("enter",)
+    assert event.phase == "ready"
+    assert event.detail == "Episode 2"
+    legacy = parse_event('@@OPERATOR_PANEL {"input":["enter"]}')
+    assert legacy.actions == ("enter",)
+    assert legacy.phase == ""
     invalid = parse_event('@@OPERATOR_PANEL {"input":"enter"}')
     assert isinstance(invalid, InvalidEvent)
     assert invalid.reason == "input actions must be a list"
+
+
+def test_workflow_process_rejects_stale_run_and_input_gate(tmp_path: Path) -> None:
+    process = WorkflowProcess(tmp_path)
+    launch = WorkflowLaunch(
+        workflow="test",
+        name="test",
+        command=(
+            sys.executable,
+            "-u",
+            "-c",
+            'print(\'@@OPERATOR_PANEL {"input":["enter"]}\'); input()',
+        ),
+        input_actions=(InputAction("enter", "Next", "\n"),),
+    )
+
+    process.start(launch)
+    status = _wait_for(process, lambda value: bool(value["input_actions"]))
+    with pytest.raises(RuntimeError, match="run changed"):
+        process.send(
+            "enter",
+            run_id="stale-run",
+            input_revision=status["input_revision"],
+        )
+    with pytest.raises(RuntimeError, match="gate changed"):
+        process.send(
+            "enter",
+            run_id=status["run_id"],
+            input_revision=status["input_revision"] - 1,
+        )
+    process.stop(run_id=status["run_id"])
 
 
 def test_protocol_events_can_be_removed_without_exposing_the_wire_prefix() -> None:

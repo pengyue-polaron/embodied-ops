@@ -80,6 +80,10 @@ type Progress = {
   detail: string
 }
 type WorkflowStatus = {
+  schema_version: number
+  revision: number
+  run_id: string
+  state: string
   active: boolean
   workflow: string
   name: string
@@ -88,6 +92,9 @@ type WorkflowStatus = {
   exit_code: number | null
   progress: Progress[]
   status_line: string
+  input_revision: number
+  input_phase: string
+  input_detail: string
   input_actions: InputAction[]
   logs: string[]
 }
@@ -106,6 +113,10 @@ type CameraHealth = {
 }
 
 const EMPTY_STATUS: WorkflowStatus = {
+  schema_version: 2,
+  revision: 0,
+  run_id: "",
+  state: "idle",
   active: false,
   workflow: "",
   name: "",
@@ -114,6 +125,9 @@ const EMPTY_STATUS: WorkflowStatus = {
   exit_code: null,
   progress: [],
   status_line: "",
+  input_revision: 0,
+  input_phase: "",
+  input_detail: "",
   input_actions: [],
   logs: [],
 }
@@ -589,7 +603,11 @@ function SessionCard({
 }) {
   const sendInput = async (action: InputAction) => {
     try {
-      onStatus(await post<WorkflowStatus>("/api/input", { action: action.id }))
+      onStatus(await post<WorkflowStatus>("/api/input", {
+        action: action.id,
+        run_id: status.run_id,
+        input_revision: status.input_revision,
+      }))
     } catch (error) {
       notify((error as Error).message)
     }
@@ -597,7 +615,7 @@ function SessionCard({
   const stop = async () => {
     if (!window.confirm("Interrupt the active workflow and let it run cleanup?")) return
     try {
-      onStatus(await post<WorkflowStatus>("/api/stop", {}))
+      onStatus(await post<WorkflowStatus>("/api/stop", { run_id: status.run_id }))
     } catch (error) {
       notify((error as Error).message)
     }
@@ -610,7 +628,11 @@ function SessionCard({
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">SESSION</p>
           <CardTitle className="mt-1 truncate text-base">{status.name || "No active workflow"}</CardTitle>
           <CardDescription className="mt-1 text-xs">
-            {!status.active ? "Start a workflow to inspect its output." : status.input_actions.length ? "Waiting for your decision." : "Running; actions appear only at guarded input points."}
+            {!status.active
+              ? "Start a workflow to inspect its output."
+              : status.input_actions.length
+                ? [status.input_phase || "Waiting for your decision", status.input_detail].filter(Boolean).join(" · ")
+                : "Running; actions appear only at guarded input points."}
           </CardDescription>
         </div>
         <Button variant="destructive" size="sm" disabled={!status.active} onClick={stop}>
