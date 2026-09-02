@@ -13,6 +13,7 @@ FEEDBACK_SCHEMA = "embodied.teleop_feedback/v1"
 COMMAND_SCHEMA = "embodied.teleop_command/v1"
 COMMAND_RESULT_SCHEMA = "embodied.teleop_command_result/v1"
 
+
 def _object(value: object, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{label} must be an object")
@@ -222,6 +223,7 @@ class TeleopFeedback:
     action: list[float]
     eef_orientation_xyzw: list[float] | None = None
     desired_eef_position: list[float] | None = None
+    desired_eef_orientation_xyzw: list[float] | None = None
     diagnostics: dict[str, Any] = field(default_factory=dict)
     timestamp_unix_ns: int = field(default_factory=time.time_ns)
     monotonic_ns: int = field(default_factory=time.monotonic_ns)
@@ -244,6 +246,11 @@ class TeleopFeedback:
             ),
             "desired_eef_position": (
                 None if self.desired_eef_position is None else list(self.desired_eef_position)
+            ),
+            "desired_eef_orientation_xyzw": (
+                None
+                if self.desired_eef_orientation_xyzw is None
+                else list(self.desired_eef_orientation_xyzw)
             ),
             "gripper": self.gripper,
             "action": list(self.action),
@@ -288,6 +295,15 @@ class TeleopFeedback:
                     value["desired_eef_position"],
                     3,
                     "feedback desired_eef_position",
+                )
+            ),
+            desired_eef_orientation_xyzw=(
+                None
+                if value.get("desired_eef_orientation_xyzw") is None
+                else _vector(
+                    value["desired_eef_orientation_xyzw"],
+                    4,
+                    "feedback desired_eef_orientation_xyzw",
                 )
             ),
             gripper=_number(value["gripper"], "feedback gripper"),

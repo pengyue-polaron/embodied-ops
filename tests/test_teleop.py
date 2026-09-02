@@ -45,6 +45,9 @@ def feedback(frame_index: int = 1) -> TeleopFeedback:
         eef_position=[0.1, 0.2, 0.3],
         gripper=-1.0,
         action=[0.0] * 7,
+        eef_orientation_xyzw=[0.0, 0.0, 0.0, 1.0],
+        desired_eef_position=[0.2, 0.3, 0.4],
+        desired_eef_orientation_xyzw=[0.0, 0.0, 1.0, 0.0],
     )
 
 
@@ -53,6 +56,13 @@ def test_target_round_trip_keeps_source_metadata() -> None:
     assert decoded.schema_version == TARGET_SCHEMA
     assert decoded.controller_id == "right"
     assert decoded.calibration_sha256 == "abc"
+
+
+def test_feedback_round_trip_keeps_actual_and_desired_pose() -> None:
+    decoded = TeleopFeedback.from_json(feedback().to_json())
+    assert decoded.eef_orientation_xyzw == [0.0, 0.0, 0.0, 1.0]
+    assert decoded.desired_eef_position == [0.2, 0.3, 0.4]
+    assert decoded.desired_eef_orientation_xyzw == [0.0, 0.0, 1.0, 0.0]
 
 
 def test_target_decoder_rejects_noncanonical_schema() -> None:
