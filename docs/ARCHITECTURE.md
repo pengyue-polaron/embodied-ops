@@ -12,7 +12,7 @@ semantics across multiple robot integrations. It is not a universal robot API.
 | Operational status | Versioned workflow snapshots, lifecycle states, revisions, guarded-input visibility, and owned-process termination | Native telemetry mapping, field sanitization, network exposure, and any control transport |
 | Artifacts | Atomic publication, digests, verified provider retrieval and pinned code environments | Artifact identity, model policy, credentials and retention |
 | Timing | Freshness, pair-skew and portable progress contracts | Sensor clocks, capture ownership and acceptable limits |
-| Cartesian teleoperation | Source-neutral target/feedback/command schemas, frame geometry, latest-state transport, and idempotent command acknowledgement | Device protocol, calibration, native action mapping, stale/workspace/safety policy, cameras, and recording |
+| Cartesian teleoperation | Source-neutral target/feedback/command schemas, frame geometry, latest-state transport, idempotent command acknowledgement, and a configurable dropout/reacquisition guard | Device protocol, calibration, guard thresholds, native action mapping, workspace/physical safety policy, cameras, and recording |
 | Dataset interoperability | Shared format readers, validators and conversions proven by at least two integrations | Robot feature schema, task policy, provenance, collection and derivative configuration |
 | Hardware | Nothing | Drivers, ROS/CAN/cameras, command leases, safety limits, calibration and reset |
 

@@ -16,13 +16,16 @@ from .contracts import (
     TeleopTarget,
 )
 from .geometry import AXIS_NAMES, build_axis_map, matrix_to_quat_xyzw
+from .safety import CartesianTargetGuard, TargetGuardResult
 
 __all__ = [
     "AXIS_NAMES",
     "COMMAND_RESULT_SCHEMA",
     "COMMAND_SCHEMA",
+    "CartesianTargetGuard",
     "FEEDBACK_SCHEMA",
     "TARGET_SCHEMA",
+    "TargetGuardResult",
     "TeleopCommand",
     "TeleopCommandResult",
     "TeleopFeedback",

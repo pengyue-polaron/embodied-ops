@@ -40,7 +40,7 @@ python -m pip install "embodied-ops[teleop-zmq]"
 | Evaluation | Stable task/repetition plans, deterministic run slots, and portable progress summaries |
 | Artifacts | Atomic publication, exact manifests, verified Hugging Face retrieval, contract digests, and pinned code environments |
 | Operator Panel | Versioned catalog, form, event, and workflow-status schemas; packaged shadcn/ui Web presentation; minimal repository adapters; normalized camera health; exclusive owned-process supervision; guarded input; typed progress; and format-driven document creation |
-| Teleoperation | Source-neutral Cartesian target and action-aligned feedback schemas; lossy latest-state PUB/SUB; acknowledged, idempotent operator commands; and shared frame-mapping geometry |
+| Teleoperation | Source-neutral Cartesian target and action-aligned feedback schemas; lossy latest-state PUB/SUB; acknowledged, idempotent operator commands; shared frame geometry; and a configurable dropout/reacquisition guard |
 | Dataset interoperability | LeRobot v3 payload-graph validation and a format-only v3-to-v2.1 builder; Runtime callers supply robot task, feature, statistics, and provenance constraints |
 
 The package owns cross-robot operational mechanics only. Robot repositories
@@ -104,9 +104,12 @@ from leaving its child process running.
 `embodied_ops.teleop` defines the common vocabulary between an input-device
 adapter, a simulator/robot backend, and read-only observers. It deliberately
 does not parse a Quest APK, load calibration profiles, map targets into native
-actions, or decide whether motion is safe. The source publishes the newest
-calibrated Cartesian target; each backend owns its watchdog, workspace limits,
-native action, recorder, and command acknowledgement.
+actions, or set robot-specific physical limits. The source publishes the newest
+calibrated Cartesian target. Backends may use the shared `CartesianTargetGuard`
+to fail closed on stale/invalid input, reject reacquisition jumps, require stable
+recovery frames, and smooth plausible motion; each backend chooses its guard
+thresholds and still owns workspace limits, native action, recorder, and command
+acknowledgement.
 
 The optional `teleop-zmq` transport uses PUB/SUB for targets and feedback,
 where dropping stale intermediate frames is desirable. Operator commands use

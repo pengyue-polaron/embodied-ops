@@ -5,6 +5,7 @@ import time
 import pytest
 
 from embodied_ops.teleop import (
+    CartesianTargetGuard,
     TARGET_SCHEMA,
     TeleopCommand,
     TeleopFeedback,
@@ -79,6 +80,94 @@ def test_contracts_reject_nonfinite_control_values() -> None:
             gripper=0.0,
             gate_open=False,
         )
+
+
+def test_target_guard_recovers_then_smooths_stationary_input() -> None:
+    guard = CartesianTargetGuard(
+        recovery_frames=3,
+        position_deadband_m=0.001,
+        position_filter_tau_s=0.05,
+        max_output_speed_m_s=0.5,
+    )
+    started = 1_000_000_000
+    results = []
+    for index, x in enumerate((0.0, 0.0002, 0.0003), start=1):
+        sample = target(index)
+        sample = TeleopTarget.from_dict(
+            {
+                **sample.to_dict(),
+                "position": [x, 0.0, 0.0],
+                "host_received_monotonic_ns": started + index * 20_000_000,
+                "host_published_unix_ns": index,
+            }
+        )
+        results.append(guard.update(sample, now_monotonic_ns=started + index * 20_000_000))
+    assert [result.ready for result in results] == [False, False, True]
+    assert results[-1].reanchored is True
+
+    held = TeleopTarget.from_dict(
+        {
+            **target(4).to_dict(),
+            "position": [0.0007, 0.0, 0.0],
+            "host_received_monotonic_ns": started + 80_000_000,
+            "host_published_unix_ns": 4,
+        }
+    )
+    result = guard.update(held, now_monotonic_ns=started + 80_000_000)
+    assert result.ready is True
+    assert result.target is not None
+    assert result.target.position == results[-1].target.position
+
+
+def test_target_guard_rejects_reacquisition_jump_and_reanchors() -> None:
+    guard = CartesianTargetGuard(recovery_frames=2, max_position_step_m=0.05)
+    started = 2_000_000_000
+
+    def sample(seq: int, x: float) -> TeleopTarget:
+        value = target(seq)
+        return TeleopTarget.from_dict(
+            {
+                **value.to_dict(),
+                "position": [x, 0.0, 0.0],
+                "host_received_monotonic_ns": started + seq * 20_000_000,
+                "host_published_unix_ns": seq,
+            }
+        )
+
+    assert not guard.update(sample(1, 0.0), now_monotonic_ns=started + 20_000_000).ready
+    assert guard.update(sample(2, 0.0), now_monotonic_ns=started + 40_000_000).ready
+    rejected = guard.update(sample(3, 0.11), now_monotonic_ns=started + 60_000_000)
+    assert rejected.ready is False
+    assert rejected.reason == "position_jump"
+    assert rejected.jump_rejections == 1
+    recovered = guard.update(sample(4, 0.111), now_monotonic_ns=started + 80_000_000)
+    assert recovered.ready is True
+    assert recovered.reanchored is True
+
+
+def test_target_guard_fails_closed_for_invalid_and_stale_samples() -> None:
+    guard = CartesianTargetGuard(recovery_frames=1, max_target_age_ms=100.0)
+    now = 3_000_000_000
+    invalid = TeleopTarget.from_dict(
+        {
+            **target().to_dict(),
+            "tracking_valid": False,
+            "host_received_monotonic_ns": now,
+        }
+    )
+    result = guard.update(invalid, now_monotonic_ns=now)
+    assert result.ready is False
+    assert result.reason == "tracking_invalid"
+
+    stale = TeleopTarget.from_dict(
+        {
+            **target(2).to_dict(),
+            "host_received_monotonic_ns": now - 200_000_000,
+        }
+    )
+    result = guard.update(stale, now_monotonic_ns=now)
+    assert result.ready is False
+    assert result.reason == "stale_target"
 
 
 def test_geometry_helpers_are_source_neutral() -> None:
