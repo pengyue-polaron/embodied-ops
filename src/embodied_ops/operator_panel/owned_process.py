@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Sequence
+from pathlib import Path
 
 
 OWNER_PID_ENV = "EMBODIED_OPS_PANEL_OWNER_PID"
@@ -27,8 +28,9 @@ def owned_command(
         raise ValueError("workflow command must not be empty")
     if owner_pid <= 1:
         raise ValueError("workflow owner pid must identify a live user process")
+    supervisor = str(Path(__file__).resolve())
     return (
-        (sys.executable, "-m", "embodied_ops.operator_panel.owned_process", *normalized),
+        (sys.executable, supervisor, *normalized),
         {OWNER_PID_ENV: str(owner_pid)},
     )
 
