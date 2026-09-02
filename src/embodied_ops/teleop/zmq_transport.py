@@ -19,6 +19,7 @@ from .contracts import (
     TeleopCommand,
     TeleopCommandResult,
     TeleopFeedback,
+    TeleopSourceStatus,
     TeleopTarget,
 )
 
@@ -60,10 +61,10 @@ class TeleopTargetPublisher:
             return False
         return True
 
-    def publish_status(self, payload: bytes) -> bool:
+    def publish_status(self, status: TeleopSourceStatus) -> bool:
         try:
             self.socket.send_multipart(
-                [DEFAULT_STATUS_TOPIC, bytes(payload)],
+                [DEFAULT_STATUS_TOPIC, status.to_json()],
                 flags=zmq.NOBLOCK,
             )
         except zmq.Again:
@@ -88,6 +89,7 @@ class TeleopTargetSubscriber:
         self.socket.setsockopt(zmq.RCVHWM, 4)
         self.socket.setsockopt(zmq.SUBSCRIBE, DEFAULT_TARGET_TOPIC)
         self.socket.connect(endpoint)
+        self.invalid_messages = 0
 
     def poll(self, timeout_ms: int = 0) -> TeleopTarget | None:
         if timeout_ms > 0 and not self.socket.poll(timeout_ms, zmq.POLLIN):
@@ -99,7 +101,10 @@ class TeleopTargetSubscriber:
             except zmq.Again:
                 return latest
             if topic == DEFAULT_TARGET_TOPIC:
-                latest = TeleopTarget.from_json(payload)
+                try:
+                    latest = TeleopTarget.from_json(payload)
+                except (KeyError, UnicodeDecodeError, ValueError):
+                    self.invalid_messages += 1
 
     def close(self) -> None:
         self.socket.close(0)
@@ -157,6 +162,7 @@ class TeleopFeedbackReceiver:
         self.socket.setsockopt(zmq.RCVHWM, 4)
         self.socket.setsockopt(zmq.SUBSCRIBE, DEFAULT_FEEDBACK_TOPIC)
         self.socket.connect(endpoint)
+        self.invalid_messages = 0
 
     def newest(self) -> tuple[TeleopFeedback, bytes, bytes] | None:
         latest = None
@@ -167,7 +173,12 @@ class TeleopFeedbackReceiver:
                 return latest
             if len(parts) != 4 or parts[0] != DEFAULT_FEEDBACK_TOPIC:
                 continue
-            latest = (TeleopFeedback.from_json(parts[1]), parts[2], parts[3])
+            try:
+                feedback = TeleopFeedback.from_json(parts[1])
+            except (KeyError, UnicodeDecodeError, ValueError):
+                self.invalid_messages += 1
+                continue
+            latest = (feedback, parts[2], parts[3])
 
     def close(self) -> None:
         self.socket.close(0)
@@ -249,6 +260,7 @@ class TeleopCommandServer:
         self.socket.bind(endpoint)
         self.result_cache_size = result_cache_size
         self._results: OrderedDict[str, bytes] = OrderedDict()
+        self._inflight: dict[str, list[bytes]] = {}
         self.invalid_requests = 0
 
     def take_all(self) -> list[TeleopCommandRequest]:
@@ -286,6 +298,10 @@ class TeleopCommandServer:
                     [routing_id, DEFAULT_COMMAND_RESULT_TOPIC, replay.to_json()]
                 )
                 continue
+            if command.request_id in self._inflight:
+                self._inflight[command.request_id].append(routing_id)
+                continue
+            self._inflight[command.request_id] = [routing_id]
             requests.append(TeleopCommandRequest(routing_id, command))
 
     def reply(
@@ -310,7 +326,22 @@ class TeleopCommandServer:
         self._results.move_to_end(result.request_id)
         while len(self._results) > self.result_cache_size:
             self._results.popitem(last=False)
-        self.socket.send_multipart([request.routing_id, DEFAULT_COMMAND_RESULT_TOPIC, encoded])
+        routes = self._inflight.pop(result.request_id, [request.routing_id])
+        self.socket.send_multipart([routes[0], DEFAULT_COMMAND_RESULT_TOPIC, encoded])
+        for routing_id in routes[1:]:
+            duplicate = TeleopCommandResult(
+                request_id=result.request_id,
+                command=result.command,
+                accepted=result.accepted,
+                applied=result.applied,
+                backend=result.backend,
+                message=result.message,
+                duplicate=True,
+                completed_unix_ns=result.completed_unix_ns,
+            )
+            self.socket.send_multipart(
+                [routing_id, DEFAULT_COMMAND_RESULT_TOPIC, duplicate.to_json()]
+            )
         return result
 
     def close(self) -> None:

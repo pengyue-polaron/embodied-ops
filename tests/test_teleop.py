@@ -1,15 +1,23 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import pytest
 
 from embodied_ops.teleop import (
+    EPISODE_MANIFEST_SCHEMA,
+    CartesianClutchMapper,
     CartesianTargetGuard,
     TARGET_SCHEMA,
     TeleopCommand,
+    TeleopCommandName,
     TeleopFeedback,
+    TeleopSourceStatus,
     TeleopTarget,
+    atomic_write_json,
+    build_episode_manifest,
+    describe_artifact,
     build_axis_map,
     matrix_to_quat_xyzw,
 )
@@ -65,6 +73,35 @@ def test_feedback_round_trip_keeps_actual_and_desired_pose() -> None:
     assert decoded.desired_eef_orientation_xyzw == [0.0, 0.0, 1.0, 0.0]
 
 
+def test_source_status_round_trip_is_strict_and_source_neutral() -> None:
+    status = TeleopSourceStatus(
+        source="synthetic",
+        session_id="session-1",
+        state="streaming",
+        target_seq=8,
+        target_age_ms=2.5,
+        gate_open=True,
+        control_ready=True,
+        stream_online=True,
+        tracking_valid=True,
+        source_metadata={"device": "test"},
+    )
+    decoded = TeleopSourceStatus.from_json(status.to_json())
+    assert decoded == status
+    assert decoded.source_metadata == {"device": "test"}
+
+
+def test_command_vocabulary_and_age_are_canonical() -> None:
+    command = TeleopCommand(
+        command=TeleopCommandName.HOLD.value,
+        request_id="request-1",
+        issued_unix_ns=1_000_000_000,
+    )
+    assert command.age_ms(now_unix_ns=1_250_000_000) == 250.0
+    with pytest.raises(ValueError, match="unsupported teleop command"):
+        TeleopCommand(command="backend_private_command", request_id="bad")
+
+
 def test_target_decoder_rejects_noncanonical_schema() -> None:
     with pytest.raises(ValueError, match="unsupported teleop target schema"):
         TeleopTarget.from_dict(
@@ -87,6 +124,16 @@ def test_contracts_reject_nonfinite_control_values() -> None:
             timestamp=1.0,
             position=[float("nan"), 0.0, 0.0],
             rotation=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            gripper=0.0,
+            gate_open=False,
+        )
+
+    with pytest.raises(ValueError, match="proper rotation matrix"):
+        TeleopTarget(
+            seq=1,
+            timestamp=1.0,
+            position=[0.0, 0.0, 0.0],
+            rotation=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]],
             gripper=0.0,
             gate_open=False,
         )
@@ -207,12 +254,102 @@ def test_geometry_helpers_are_source_neutral() -> None:
         [1.0, 0.0, 0.0],
         [0.0, 0.0, 1.0],
     ]
+
+
+def test_cartesian_mapper_reanchors_clutch_and_bounds_workspace() -> None:
+    mapper = CartesianClutchMapper(
+        teleop_to_world=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+        position_scale=2.0,
+        workspace_half_extent=[0.1, 0.1, 0.1],
+        orientation=False,
+        recovery_frames=1,
+        position_filter_tau_s=0.00001,
+        max_target_speed_m_s=100.0,
+    )
+    started = time.monotonic_ns()
+    first_target = TeleopTarget.from_dict(
+        {**target(1).to_dict(), "host_received_monotonic_ns": started}
+    )
+    first = mapper.update(
+        first_target,
+        target_received_monotonic_ns=started,
+        eef_position=[0.5, 0.0, 0.2],
+        eef_rotation=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+    )
+    assert first.desired_position == [0.5, 0.0, 0.2]
+    moved = TeleopTarget.from_dict(
+        {
+            **target(2).to_dict(),
+            "position": [0.3, 0.2, 0.3],
+            "host_received_monotonic_ns": started + 20_000_000,
+        }
+    )
+    second = mapper.update(
+        moved,
+        target_received_monotonic_ns=started + 20_000_000,
+        eef_position=[0.5, 0.0, 0.2],
+        eef_rotation=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+    )
+    assert second.desired_position[0] <= 0.6
+    assert second.saturated is True
+
+
+def test_episode_manifest_hashes_artifacts_and_is_atomic(tmp_path: Path) -> None:
+    episode = tmp_path / "episode"
+    episode.mkdir()
+    steps = episode / "steps.jsonl"
+    steps.write_text("{}\n", encoding="utf-8")
+    artifacts = {
+        "steps": describe_artifact(
+            steps,
+            relative_to=episode,
+            media_type="application/x-ndjson",
+            sample_count=1,
+        )
+    }
+    manifest = build_episode_manifest(
+        backend="unit",
+        episode_id="episode-1",
+        step_count=1,
+        operator_disposition="saved",
+        termination_reason="operator_save",
+        training_eligible=True,
+        artifacts=artifacts,
+    )
+    atomic_write_json(episode / "manifest.json", manifest)
+    assert manifest["schema_version"] == EPISODE_MANIFEST_SCHEMA
+    assert artifacts["steps"]["bytes"] == 3
+    assert len(artifacts["steps"]["sha256"]) == 64
+    assert not list(episode.glob("*.tmp"))
     assert matrix_to_quat_xyzw([[1, 0, 0], [0, 1, 0], [0, 0, 1]]) == [
         0.0,
         0.0,
         0.0,
         1.0,
     ]
+
+
+def test_episode_manifest_rejects_misaligned_artifacts(tmp_path: Path) -> None:
+    episode = tmp_path / "episode"
+    episode.mkdir()
+    steps = episode / "steps.jsonl"
+    steps.write_text("{}\n", encoding="utf-8")
+    descriptor = describe_artifact(
+        steps,
+        relative_to=episode,
+        media_type="application/x-ndjson",
+        sample_count=1,
+    )
+    with pytest.raises(ValueError, match="sample_count"):
+        build_episode_manifest(
+            backend="unit",
+            episode_id="episode-1",
+            step_count=2,
+            operator_disposition="saved",
+            termination_reason="operator_save",
+            training_eligible=True,
+            artifacts={"steps": descriptor},
+        )
 
 
 def test_zmq_target_feedback_and_acknowledged_command() -> None:

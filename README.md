@@ -41,7 +41,7 @@ python -m pip install "embodied-ops[teleop-zmq]"
 | Artifacts | Atomic publication, exact manifests, verified Hugging Face retrieval, contract digests, and pinned code environments |
 | Operator Panel | Versioned catalog, form, event, and workflow-status schemas; packaged shadcn/ui Web presentation; minimal repository adapters; normalized camera health; exclusive owned-process supervision; phase-aware revisioned input gates; typed progress; and format-driven document creation |
 | Foxglove presentation | Robot-neutral Collection Console extension, versioned per-layout topic/service state, and fail-closed organization-layout upserts; Runtime adapters retain native telemetry, service authorization, bridge policy, and final layout composition |
-| Teleoperation | Source-neutral Cartesian target and action-aligned feedback schemas; lossy latest-state PUB/SUB; acknowledged, idempotent operator commands; shared frame geometry; and a configurable dropout/reacquisition guard |
+| Teleoperation | Source-neutral target, source-status, feedback, command, step, and episode schemas; lossy latest-state PUB/SUB; acknowledged idempotent commands; shared Cartesian clutch mapping and guards; atomic manifests with artifact hashes |
 | Dataset interoperability | LeRobot v3 payload-graph validation and a format-only v3-to-v2.1 builder; Runtime callers supply robot task, feature, statistics, and provenance constraints |
 
 The package owns cross-robot operational mechanics only. Robot repositories
@@ -128,14 +128,21 @@ actions, or set robot-specific physical limits. The source publishes the newest
 calibrated Cartesian target. Backends may use the shared `CartesianTargetGuard`
 to fail closed on stale/invalid input, reject reacquisition jumps, require stable
 recovery frames, and smooth plausible motion; each backend chooses its guard
-thresholds and still owns workspace limits, native action, recorder, and command
-acknowledgement.
+thresholds and still owns workspace limits, native action conversion, cameras,
+and task-specific recording fields. `CartesianClutchMapper` centralizes the
+backend-neutral relative clutch, frame mapping, workspace clamp, and dropout
+behavior so simulators do not reimplement those state transitions.
 
 The optional `teleop-zmq` transport uses PUB/SUB for targets and feedback,
 where dropping stale intermediate frames is desirable. Operator commands use
 DEALER/ROUTER and return a versioned `TeleopCommandResult`; a UI must not report
 success merely because it sent a request. Duplicate request IDs replay the
 cached result without applying an action twice.
+
+Backend recorders write `embodied.teleop_step/v1` rows and publish an
+`embodied.teleop_episode/v1` manifest last. The manifest is the completion
+marker: it records operator disposition, training eligibility, termination,
+aligned sample counts, byte sizes, and SHA-256 digests for every artifact.
 
 The Web source lives under `web/` as a Vite + React + TypeScript application.
 It uses checked-in shadcn/ui components and compiles to the dependency-free

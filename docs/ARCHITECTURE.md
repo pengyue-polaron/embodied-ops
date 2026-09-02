@@ -13,7 +13,7 @@ semantics across multiple robot integrations. It is not a universal robot API.
 | Foxglove presentation | Robot-neutral Collection Console, strict per-layout topic/service state, and organization-layout API mechanics | Native messages/services, bridge lifecycle, concrete layout, URDF/sensors, network policy, and action authorization |
 | Artifacts | Atomic publication, digests, verified provider retrieval and pinned code environments | Artifact identity, model policy, credentials and retention |
 | Timing | Freshness, pair-skew and portable progress contracts | Sensor clocks, capture ownership and acceptable limits |
-| Cartesian teleoperation | Source-neutral target/feedback/command schemas, frame geometry, latest-state transport, idempotent command acknowledgement, and a configurable dropout/reacquisition guard | Device protocol, calibration, guard thresholds, native action mapping, workspace/physical safety policy, cameras, and recording |
+| Cartesian teleoperation | Source-neutral target/status/feedback/command and recording schemas, frame geometry, latest-state transport, idempotent command acknowledgement, shared relative-clutch mapping, dropout/reacquisition guard, and atomic episode manifests | Device protocol, calibration, thresholds, native action conversion, workspace/physical safety policy, cameras, task fields, and retention |
 | Dataset interoperability | Shared format readers, validators and conversions proven by at least two integrations | Robot feature schema, task policy, provenance, collection and derivative configuration |
 | Hardware | Nothing | Drivers, ROS/CAN/cameras, command leases, safety limits, calibration and reset |
 

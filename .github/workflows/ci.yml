@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e ".[lerobot-dataset]" pytest ruff build
+      - run: python -m pip install -e ".[lerobot-dataset,teleop-zmq]" pytest ruff build
       - run: python -m pytest
       - run: ruff check .
       - run: ruff format --check .

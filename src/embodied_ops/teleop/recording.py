@@ -1,0 +1,133 @@
+"""Durable, backend-neutral episode recording primitives."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import tempfile
+from pathlib import Path
+from typing import Any
+
+EPISODE_MANIFEST_SCHEMA = "embodied.teleop_episode/v1"
+STEP_SCHEMA = "embodied.teleop_step/v1"
+
+
+def sha256_file(path: Path, *, chunk_size: int = 1024 * 1024) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(chunk_size):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def describe_artifact(
+    path: Path,
+    *,
+    relative_to: Path,
+    media_type: str,
+    sample_count: int | None = None,
+) -> dict[str, Any]:
+    resolved = path.resolve()
+    root = relative_to.resolve()
+    try:
+        relative = resolved.relative_to(root)
+    except ValueError as exc:
+        raise ValueError("artifact must be inside the episode directory") from exc
+    if not resolved.is_file():
+        raise FileNotFoundError(resolved)
+    result: dict[str, Any] = {
+        "path": relative.as_posix(),
+        "media_type": media_type,
+        "bytes": resolved.stat().st_size,
+        "sha256": sha256_file(resolved),
+    }
+    if sample_count is not None:
+        if sample_count < 0:
+            raise ValueError("sample_count must be non-negative")
+        result["sample_count"] = int(sample_count)
+    return result
+
+
+def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
+    """Write JSON durably and atomically; the final path is the commit marker."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    encoded = json.dumps(payload, indent=2, sort_keys=True, allow_nan=False).encode("utf-8") + b"\n"
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(encoded)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        try:
+            directory_descriptor = os.open(path.parent, os.O_RDONLY)
+        except OSError:
+            directory_descriptor = None
+        if directory_descriptor is not None:
+            try:
+                os.fsync(directory_descriptor)
+            finally:
+                os.close(directory_descriptor)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def build_episode_manifest(
+    *,
+    backend: str,
+    episode_id: str,
+    step_count: int,
+    operator_disposition: str,
+    termination_reason: str,
+    training_eligible: bool,
+    artifacts: dict[str, dict[str, Any]],
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if not backend or not episode_id or not termination_reason:
+        raise ValueError("backend, episode_id, and termination_reason are required")
+    if step_count < 0:
+        raise ValueError("step_count must be non-negative")
+    if operator_disposition not in {"saved", "interrupted"}:
+        raise ValueError("operator_disposition must be saved or interrupted")
+    if training_eligible and operator_disposition != "saved":
+        raise ValueError("only saved recordings can be training eligible")
+    normalized_artifacts: dict[str, dict[str, Any]] = {}
+    for name, descriptor in artifacts.items():
+        if not name or not isinstance(descriptor, dict):
+            raise ValueError("artifact names must be non-empty and descriptors must be objects")
+        required = {"path", "media_type", "bytes", "sha256"}
+        if not required.issubset(descriptor):
+            raise ValueError(f"artifact {name!r} is missing required fields")
+        if (
+            not isinstance(descriptor["path"], str)
+            or not descriptor["path"]
+            or not isinstance(descriptor["media_type"], str)
+            or not descriptor["media_type"]
+            or isinstance(descriptor["bytes"], bool)
+            or not isinstance(descriptor["bytes"], int)
+            or descriptor["bytes"] < 0
+            or not isinstance(descriptor["sha256"], str)
+            or len(descriptor["sha256"]) != 64
+        ):
+            raise ValueError(f"artifact {name!r} has an invalid descriptor")
+        sample_count = descriptor.get("sample_count")
+        if sample_count is not None and sample_count != step_count:
+            raise ValueError(f"artifact {name!r} sample_count does not match episode step_count")
+        normalized_artifacts[name] = dict(descriptor)
+    return {
+        "schema_version": EPISODE_MANIFEST_SCHEMA,
+        "backend": backend,
+        "episode_id": episode_id,
+        "integrity_complete": True,
+        "operator_disposition": operator_disposition,
+        "training_eligible": bool(training_eligible),
+        "termination_reason": termination_reason,
+        "step_count": int(step_count),
+        "artifacts": normalized_artifacts,
+        "metadata": {} if metadata is None else dict(metadata),
+    }

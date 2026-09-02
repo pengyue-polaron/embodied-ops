@@ -6,12 +6,30 @@ import json
 import math
 import time
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
 
 TARGET_SCHEMA = "embodied.teleop_target/v1"
 FEEDBACK_SCHEMA = "embodied.teleop_feedback/v1"
 COMMAND_SCHEMA = "embodied.teleop_command/v1"
 COMMAND_RESULT_SCHEMA = "embodied.teleop_command_result/v1"
+SOURCE_STATUS_SCHEMA = "embodied.teleop_source_status/v1"
+
+
+class TeleopCommandName(str, Enum):
+    """The complete, source-neutral operator command vocabulary."""
+
+    HOLD = "hold"
+    RESUME = "resume"
+    RESET_EPISODE = "reset_episode"
+    PREVIOUS_EPISODE = "previous_episode"
+    NEXT_EPISODE = "next_episode"
+    START_RECORDING = "start_recording"
+    STOP_RECORDING = "stop_recording"
+    DISCARD_RECORDING = "discard_recording"
+
+
+TELEOP_COMMAND_NAMES = frozenset(item.value for item in TeleopCommandName)
 
 
 def _object(value: object, label: str) -> dict[str, Any]:
@@ -55,6 +73,10 @@ def _optional_number(value: object, label: str) -> float | None:
     return None if value is None else _number(value, label)
 
 
+def _optional_text(value: object, label: str) -> str | None:
+    return None if value is None else _text(value, label)
+
+
 def _vector(value: object, length: int, label: str) -> list[float]:
     if not isinstance(value, (list, tuple)) or len(value) != length:
         raise ValueError(f"{label} must contain {length} finite numbers")
@@ -65,6 +87,25 @@ def _matrix3(value: object, label: str) -> list[list[float]]:
     if not isinstance(value, (list, tuple)) or len(value) != 3:
         raise ValueError(f"{label} must be a 3x3 matrix")
     return [_vector(row, 3, f"{label}[{index}]") for index, row in enumerate(value)]
+
+
+def _rotation_matrix3(value: object, label: str) -> list[list[float]]:
+    matrix = _matrix3(value, label)
+    tolerance = 1e-3
+    for row_index, row in enumerate(matrix):
+        for other_index, other in enumerate(matrix):
+            expected = 1.0 if row_index == other_index else 0.0
+            dot = sum(left * right for left, right in zip(row, other, strict=True))
+            if abs(dot - expected) > tolerance:
+                raise ValueError(f"{label} must be orthonormal")
+    determinant = (
+        matrix[0][0] * (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1])
+        - matrix[0][1] * (matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0])
+        + matrix[0][2] * (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0])
+    )
+    if abs(determinant - 1.0) > tolerance:
+        raise ValueError(f"{label} must be a proper rotation matrix")
+    return matrix
 
 
 def _json_bytes(value: dict[str, Any]) -> bytes:
@@ -94,7 +135,7 @@ class TeleopTarget:
         _integer(self.seq, "target seq")
         _number(self.timestamp, "target timestamp")
         _vector(self.position, 3, "target position")
-        _matrix3(self.rotation, "target rotation")
+        _rotation_matrix3(self.rotation, "target rotation")
         gripper = _number(self.gripper, "target gripper")
         if not -1.0 <= gripper <= 1.0:
             raise ValueError("target gripper must be within [-1, 1]")
@@ -141,7 +182,7 @@ class TeleopTarget:
             seq=_integer(value["seq"], "target seq"),
             timestamp=_number(value["timestamp"], "target timestamp"),
             position=_vector(value["position"], 3, "target position"),
-            rotation=_matrix3(value["rotation"], "target rotation"),
+            rotation=_rotation_matrix3(value["rotation"], "target rotation"),
             gripper=_number(value["gripper"], "target gripper"),
             gate_open=_boolean(value["gate_open"], "target gate_open"),
             source=_text(value.get("source", "quest"), "target source"),
@@ -228,6 +269,37 @@ class TeleopFeedback:
     timestamp_unix_ns: int = field(default_factory=time.time_ns)
     monotonic_ns: int = field(default_factory=time.monotonic_ns)
     schema_version: str = FEEDBACK_SCHEMA
+
+    def __post_init__(self) -> None:
+        _text(self.backend, "feedback backend")
+        _text(self.episode_id, "feedback episode_id")
+        _integer(self.frame_index, "feedback frame_index")
+        _text(self.status, "feedback status")
+        _optional_integer(self.target_seq, "feedback target_seq")
+        _optional_number(self.target_age_ms, "feedback target_age_ms")
+        _boolean(self.gate_open, "feedback gate_open")
+        _boolean(self.recording, "feedback recording")
+        _vector(self.eef_position, 3, "feedback eef_position")
+        if self.eef_orientation_xyzw is not None:
+            _vector(self.eef_orientation_xyzw, 4, "feedback eef_orientation_xyzw")
+        if self.desired_eef_position is not None:
+            _vector(self.desired_eef_position, 3, "feedback desired_eef_position")
+        if self.desired_eef_orientation_xyzw is not None:
+            _vector(
+                self.desired_eef_orientation_xyzw,
+                4,
+                "feedback desired_eef_orientation_xyzw",
+            )
+        _number(self.gripper, "feedback gripper")
+        if not isinstance(self.action, (list, tuple)):
+            raise ValueError("feedback action must be a sequence")
+        for index, item in enumerate(self.action):
+            _number(item, f"feedback action[{index}]")
+        _object(self.diagnostics, "feedback diagnostics")
+        _integer(self.timestamp_unix_ns, "feedback timestamp_unix_ns")
+        _integer(self.monotonic_ns, "feedback monotonic_ns")
+        if self.schema_version != FEEDBACK_SCHEMA:
+            raise ValueError(f"unsupported emitted feedback schema: {self.schema_version}")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -327,6 +399,20 @@ class TeleopCommand:
     issued_unix_ns: int = field(default_factory=time.time_ns)
     schema_version: str = COMMAND_SCHEMA
 
+    def __post_init__(self) -> None:
+        name = _text(self.command, "command name")
+        if name not in TELEOP_COMMAND_NAMES:
+            raise ValueError(f"unsupported teleop command: {name}")
+        _text(self.request_id, "command request_id")
+        _object(self.arguments, "command arguments")
+        _integer(self.issued_unix_ns, "command issued_unix_ns")
+        if self.schema_version != COMMAND_SCHEMA:
+            raise ValueError(f"unsupported emitted command schema: {self.schema_version}")
+
+    def age_ms(self, *, now_unix_ns: int | None = None) -> float:
+        now = time.time_ns() if now_unix_ns is None else now_unix_ns
+        return max(0.0, (now - self.issued_unix_ns) / 1_000_000.0)
+
     def to_json(self) -> bytes:
         return _json_bytes(
             {
@@ -367,6 +453,21 @@ class TeleopCommandResult:
     completed_unix_ns: int = field(default_factory=time.time_ns)
     schema_version: str = COMMAND_RESULT_SCHEMA
 
+    def __post_init__(self) -> None:
+        _text(self.request_id, "result request_id")
+        name = _text(self.command, "result command")
+        if name not in TELEOP_COMMAND_NAMES:
+            raise ValueError(f"unsupported teleop command: {name}")
+        _boolean(self.accepted, "result accepted")
+        _boolean(self.applied, "result applied")
+        _text(self.backend, "result backend")
+        if not isinstance(self.message, str):
+            raise ValueError("result message must be text")
+        _boolean(self.duplicate, "result duplicate")
+        _integer(self.completed_unix_ns, "result completed_unix_ns")
+        if self.schema_version != COMMAND_RESULT_SCHEMA:
+            raise ValueError(f"unsupported emitted command-result schema: {self.schema_version}")
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
@@ -398,4 +499,94 @@ class TeleopCommandResult:
             message=str(value.get("message", "")),
             duplicate=_boolean(value.get("duplicate", False), "result duplicate"),
             completed_unix_ns=_integer(value["completed_unix_ns"], "result completed_unix_ns"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class TeleopSourceStatus:
+    """Current health of a canonical teleoperation target source."""
+
+    source: str
+    session_id: str
+    state: str
+    target_seq: int | None
+    target_age_ms: float | None
+    gate_open: bool
+    control_ready: bool
+    stream_online: bool
+    tracking_valid: bool
+    raw_age_ms: float | None = None
+    valid_age_ms: float | None = None
+    pause_state: str | None = None
+    source_metadata: dict[str, Any] = field(default_factory=dict)
+    timestamp_unix_ns: int = field(default_factory=time.time_ns)
+    schema_version: str = SOURCE_STATUS_SCHEMA
+
+    def __post_init__(self) -> None:
+        _text(self.source, "source status source")
+        _text(self.session_id, "source status session_id")
+        _text(self.state, "source status state")
+        _optional_integer(self.target_seq, "source status target_seq")
+        _optional_number(self.target_age_ms, "source status target_age_ms")
+        _boolean(self.gate_open, "source status gate_open")
+        _boolean(self.control_ready, "source status control_ready")
+        _boolean(self.stream_online, "source status stream_online")
+        _boolean(self.tracking_valid, "source status tracking_valid")
+        _optional_number(self.raw_age_ms, "source status raw_age_ms")
+        _optional_number(self.valid_age_ms, "source status valid_age_ms")
+        _optional_text(self.pause_state, "source status pause_state")
+        _object(self.source_metadata, "source status source_metadata")
+        _integer(self.timestamp_unix_ns, "source status timestamp_unix_ns")
+        if self.schema_version != SOURCE_STATUS_SCHEMA:
+            raise ValueError(f"unsupported emitted source-status schema: {self.schema_version}")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "source": self.source,
+            "session_id": self.session_id,
+            "state": self.state,
+            "target_seq": self.target_seq,
+            "target_age_ms": self.target_age_ms,
+            "gate_open": self.gate_open,
+            "control_ready": self.control_ready,
+            "stream_online": self.stream_online,
+            "tracking_valid": self.tracking_valid,
+            "raw_age_ms": self.raw_age_ms,
+            "valid_age_ms": self.valid_age_ms,
+            "pause_state": self.pause_state,
+            "source_metadata": dict(self.source_metadata),
+            "timestamp_unix_ns": self.timestamp_unix_ns,
+        }
+
+    def to_json(self) -> bytes:
+        return _json_bytes(self.to_dict())
+
+    @classmethod
+    def from_json(cls, payload: bytes | str) -> TeleopSourceStatus:
+        text = payload.decode("utf-8") if isinstance(payload, bytes) else payload
+        value = _object(json.loads(text), "teleop source status")
+        if value.get("schema_version") != SOURCE_STATUS_SCHEMA:
+            raise ValueError("unsupported teleop source-status schema")
+        return cls(
+            source=_text(value["source"], "source status source"),
+            session_id=_text(value["session_id"], "source status session_id"),
+            state=_text(value["state"], "source status state"),
+            target_seq=_optional_integer(value.get("target_seq"), "source status target_seq"),
+            target_age_ms=_optional_number(
+                value.get("target_age_ms"), "source status target_age_ms"
+            ),
+            gate_open=_boolean(value["gate_open"], "source status gate_open"),
+            control_ready=_boolean(value["control_ready"], "source status control_ready"),
+            stream_online=_boolean(value["stream_online"], "source status stream_online"),
+            tracking_valid=_boolean(value["tracking_valid"], "source status tracking_valid"),
+            raw_age_ms=_optional_number(value.get("raw_age_ms"), "source status raw_age_ms"),
+            valid_age_ms=_optional_number(value.get("valid_age_ms"), "source status valid_age_ms"),
+            pause_state=_optional_text(value.get("pause_state"), "source status pause_state"),
+            source_metadata=_object(
+                value.get("source_metadata", {}), "source status source_metadata"
+            ),
+            timestamp_unix_ns=_integer(
+                value["timestamp_unix_ns"], "source status timestamp_unix_ns"
+            ),
         )
