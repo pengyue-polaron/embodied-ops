@@ -49,8 +49,9 @@ must construct a validated, allowlisted summary instead of forwarding the
 response verbatim. Reported input-action ids are display-only and confer no
 control authority. A native integration may send input only through the same
 application boundary with the exact current `(run_id, input_revision, action)`
-tuple. This package deliberately defines no ROS, Foxglove, or other robot-native
-transport; each Runtime owns its mapping, access policy, and network boundary.
+tuple. The sibling Foxglove integration supplies only a robot-neutral console
+and layout/API helpers; each Runtime still owns its native mapping, bridge,
+access policy, service authorization, and network boundary.
 
 The supervisor owns the complete launched process group. If the panel server
 shuts down while a workflow is active, it stops that group before completing

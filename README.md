@@ -40,6 +40,7 @@ python -m pip install "embodied-ops[teleop-zmq]"
 | Evaluation | Stable task/repetition plans, deterministic run slots, and portable progress summaries |
 | Artifacts | Atomic publication, exact manifests, verified Hugging Face retrieval, contract digests, and pinned code environments |
 | Operator Panel | Versioned catalog, form, event, and workflow-status schemas; packaged shadcn/ui Web presentation; minimal repository adapters; normalized camera health; exclusive owned-process supervision; phase-aware revisioned input gates; typed progress; and format-driven document creation |
+| Foxglove presentation | Robot-neutral Collection Console extension, versioned per-layout topic/service state, and fail-closed organization-layout upserts; Runtime adapters retain native telemetry, service authorization, bridge policy, and final layout composition |
 | Teleoperation | Source-neutral Cartesian target and action-aligned feedback schemas; lossy latest-state PUB/SUB; acknowledged, idempotent operator commands; shared frame geometry; and a configurable dropout/reacquisition guard |
 | Dataset interoperability | LeRobot v3 payload-graph validation and a format-only v3-to-v2.1 builder; Runtime callers supply robot task, feature, statistics, and provenance constraints |
 
@@ -89,16 +90,24 @@ timestamps, typed progress, and the currently accepted guarded-input actions.
 Lifecycle states are `idle`, `running`,
 `waiting_for_input`, `stopping`, `stopped`, `succeeded`, and `failed`.
 
-A robot integration may validate and sanitize that snapshot before mapping it
-to a native observability transport. For example, Galaxea A1 mirrors workflow
-identity, progress, state, and failures to a read-only ROS topic for Foxglove,
-while deliberately omitting child command arguments and terminal logs. ROS,
-Foxglove, network exposure, and topic policy remain the robot Runtime's
-responsibility; `embodied-ops` does not import or own them. Status is
+A robot integration validates and sanitizes that snapshot before mapping it to
+a native observability transport. The shared Foxglove Collection Console reads
+that sanitized schema-2 JSON from a Runtime-configured ROS String topic and
+calls only the five Trigger services supplied in its versioned layout state.
+ROS messages, bridge lifecycle, network exposure, topic/service allowlists, and
+the mapping itself remain the robot Runtime's responsibility. Status is
 observational: the action identifiers it reports do not themselves grant
 permission to send input or start work. A robot-specific control adapter must
 submit the exact current `(run_id, input_revision, action)` tuple; stale,
 replayed, undeclared, and cross-run actions are rejected.
+
+The dependency-free `embodied_ops.foxglove` module validates and sanitizes
+workflow snapshots, checks native collection actions against the exact current
+input gate, builds strict panel state, and upserts committed organization
+layouts. The extension source lives in `foxglove/collection-console`; it
+contains no robot identity or default topic. A deployment repository may
+package its pinned revision, but the resulting extension should be published
+only once per Foxglove organization.
 
 Integrations that need one application owner for Web and a private native
 transport can construct `OperatorPanelApplication` directly, expose only their
@@ -136,6 +145,11 @@ package assets served by Python:
 cd web
 npm ci
 npm run build
+
+cd ../foxglove/collection-console
+npm ci
+npm run build
+npm run lint
 ```
 
 ## Atomic artifacts

@@ -10,6 +10,7 @@ semantics across multiple robot integrations. It is not a universal robot API.
 | --- | --- | --- |
 | Operator workflow | CLI levels, check/dataset result presentation, collection decisions and summaries, task selection, evaluation plans, Panel schemas and supervision | Available commands, readiness gates, workflow composition and hardware decisions |
 | Operational status | Versioned workflow snapshots, lifecycle states, run/input revisions, phase-aware guarded-input visibility, stale/replay rejection, and owned-process termination | Native telemetry mapping, field sanitization, network exposure, action allowlists, and any control transport |
+| Foxglove presentation | Robot-neutral Collection Console, strict per-layout topic/service state, and organization-layout API mechanics | Native messages/services, bridge lifecycle, concrete layout, URDF/sensors, network policy, and action authorization |
 | Artifacts | Atomic publication, digests, verified provider retrieval and pinned code environments | Artifact identity, model policy, credentials and retention |
 | Timing | Freshness, pair-skew and portable progress contracts | Sensor clocks, capture ownership and acceptable limits |
 | Cartesian teleoperation | Source-neutral target/feedback/command schemas, frame geometry, latest-state transport, idempotent command acknowledgement, and a configurable dropout/reacquisition guard | Device protocol, calibration, guard thresholds, native action mapping, workspace/physical safety policy, cameras, and recording |
@@ -23,7 +24,8 @@ only when the corresponding feature is used.
 ## Current scope
 
 Version 0.9 implements the operator-workflow, artifact, timing, task,
-evaluation, Operator Panel, and dataset-interoperability rows above. The shared
+evaluation, Operator Panel, Foxglove-presentation, and dataset-interoperability
+rows above. The shared
 dataset module validates LeRobot v3 metadata/payload graphs and builds the
 format-only portion of v2.1 derivatives. Galaxea A1 and VLAI L1 provide the
 robot feature requirements, task/provenance checks, publication transaction,
@@ -40,13 +42,13 @@ lease and fail-closed semantics. Until then, robot-specific protocols stay with
 their Runtime repository.
 
 The Operator Panel's read-only status endpoint is a presentation contract, not
-a robot transport. A Runtime may validate and map an allowlisted subset into
-ROS, Foxglove, or another native observability system, but it owns that mapping
-and must not treat reported input actions as control authority. If the Runtime
-also maps native controls back into the shared application, every input must
-carry the current run id and input-gate revision and still pass the declared
-action check. Command arguments and terminal history require deliberate
-sanitization before wider exposure.
+a robot transport. The shared Foxglove console consumes a sanitized projection
+through Runtime-supplied topic and Trigger-service names stored in each layout;
+it contains no robot identity or endpoint defaults. The Runtime owns the native
+mapping, bridge process, allowlists, network exposure, concrete layout, and
+service authorization. Every forwarded input must carry the current run id and
+input-gate revision and still pass the declared action check. Command arguments
+and terminal history require deliberate sanitization before wider exposure.
 
 ## Dependency direction
 
