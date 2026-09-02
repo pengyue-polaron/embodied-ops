@@ -6,11 +6,85 @@ import hashlib
 import json
 import os
 import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .contracts import TeleopTarget
+
 EPISODE_MANIFEST_SCHEMA = "embodied.teleop_episode/v1"
 STEP_SCHEMA = "embodied.teleop_step/v1"
+
+
+@dataclass(slots=True)
+class TeleopEpisodeProvenance:
+    """Summarize source identity and continuity across one recorded take."""
+
+    target_count: int = 0
+    first_target_seq: int | None = None
+    last_target_seq: int | None = None
+    sequence_regressions: int = 0
+    sources: set[str] = field(default_factory=set)
+    session_ids: set[str] = field(default_factory=set)
+    controller_ids: set[str] = field(default_factory=set)
+    calibration_ids: set[str] = field(default_factory=set)
+    calibration_sha256: set[str] = field(default_factory=set)
+    _last_seq_by_session: dict[str, int] = field(default_factory=dict, repr=False)
+
+    def observe(self, target: TeleopTarget | None) -> None:
+        if target is None:
+            return
+        if (
+            target.session_id in self._last_seq_by_session
+            and target.seq < self._last_seq_by_session[target.session_id]
+        ):
+            self.sequence_regressions += 1
+        if self.first_target_seq is None:
+            self.first_target_seq = target.seq
+        self.last_target_seq = target.seq
+        self._last_seq_by_session[target.session_id] = target.seq
+        self.target_count += 1
+        self.sources.add(target.source)
+        self.session_ids.add(target.session_id)
+        self.controller_ids.add(target.controller_id)
+        if target.calibration_id is not None:
+            self.calibration_ids.add(target.calibration_id)
+        if target.calibration_sha256 is not None:
+            self.calibration_sha256.add(target.calibration_sha256)
+
+    def eligibility_issues(self) -> list[str]:
+        issues = []
+        if self.target_count == 0:
+            issues.append("no_source_target")
+        if len(self.sources) != 1:
+            issues.append("mixed_source")
+        if len(self.session_ids) != 1:
+            issues.append("mixed_source_session")
+        if self.sequence_regressions:
+            issues.append("target_sequence_regression")
+        if len(self.calibration_ids) > 1 or len(self.calibration_sha256) > 1:
+            issues.append("mixed_calibration")
+        if self.sources == {"quest"} and len(self.calibration_sha256) != 1:
+            issues.append("missing_quest_calibration_digest")
+        return issues
+
+    @property
+    def training_eligible(self) -> bool:
+        return not self.eligibility_issues()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "target_count": self.target_count,
+            "first_target_seq": self.first_target_seq,
+            "last_target_seq": self.last_target_seq,
+            "sequence_regressions": self.sequence_regressions,
+            "sources": sorted(self.sources),
+            "session_ids": sorted(self.session_ids),
+            "controller_ids": sorted(self.controller_ids),
+            "calibration_ids": sorted(self.calibration_ids),
+            "calibration_sha256": sorted(self.calibration_sha256),
+            "eligibility_issues": self.eligibility_issues(),
+        }
 
 
 def sha256_file(path: Path, *, chunk_size: int = 1024 * 1024) -> str:

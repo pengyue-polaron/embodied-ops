@@ -143,6 +143,8 @@ Backend recorders write `embodied.teleop_step/v1` rows and publish an
 `embodied.teleop_episode/v1` manifest last. The manifest is the completion
 marker: it records operator disposition, training eligibility, termination,
 aligned sample counts, byte sizes, and SHA-256 digests for every artifact.
+`TeleopEpisodeProvenance` also summarizes source/session/controller/calibration
+identity and disqualifies mixed or regressing streams from training use.
 
 The Web source lives under `web/` as a Vite + React + TypeScript application.
 It uses checked-in shadcn/ui components and compiles to the dependency-free

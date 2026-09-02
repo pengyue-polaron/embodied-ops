@@ -24,6 +24,7 @@ from .mapping import CartesianClutchMapper, CartesianMappingResult
 from .recording import (
     EPISODE_MANIFEST_SCHEMA,
     STEP_SCHEMA,
+    TeleopEpisodeProvenance,
     atomic_write_json,
     build_episode_manifest,
     describe_artifact,
@@ -49,6 +50,7 @@ __all__ = [
     "TeleopCommandName",
     "TeleopCommandResult",
     "TeleopFeedback",
+    "TeleopEpisodeProvenance",
     "TeleopSourceStatus",
     "TeleopTarget",
     "atomic_write_json",

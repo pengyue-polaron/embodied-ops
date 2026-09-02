@@ -12,6 +12,7 @@ from embodied_ops.teleop import (
     TARGET_SCHEMA,
     TeleopCommand,
     TeleopCommandName,
+    TeleopEpisodeProvenance,
     TeleopFeedback,
     TeleopSourceStatus,
     TeleopTarget,
@@ -350,6 +351,31 @@ def test_episode_manifest_rejects_misaligned_artifacts(tmp_path: Path) -> None:
             training_eligible=True,
             artifacts={"steps": descriptor},
         )
+
+
+def test_episode_provenance_rejects_mixed_sessions_and_quest_calibration() -> None:
+    provenance = TeleopEpisodeProvenance()
+    first = target(10)
+    provenance.observe(first)
+    assert provenance.training_eligible is True
+    provenance.observe(
+        TeleopTarget.from_dict(
+            {
+                **first.to_dict(),
+                "seq": 1,
+                "session_id": "session-2",
+                "source_metadata": {
+                    **first.source_metadata,
+                    "calibration_sha256": "different",
+                },
+            }
+        )
+    )
+    assert provenance.training_eligible is False
+    assert provenance.eligibility_issues() == [
+        "mixed_source_session",
+        "mixed_calibration",
+    ]
 
 
 def test_zmq_target_feedback_and_acknowledged_command() -> None:
