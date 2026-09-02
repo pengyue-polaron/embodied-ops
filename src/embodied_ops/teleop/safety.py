@@ -76,6 +76,7 @@ class CartesianTargetGuard:
         max_position_speed_m_s: float = 3.0,
         max_rotation_step_rad: float = 1.2,
         max_rotation_speed_rad_s: float = 12.0,
+        guard_rotation: bool = True,
         position_deadband_m: float = 0.001,
         position_filter_tau_s: float = 0.05,
         max_output_speed_m_s: float = 0.5,
@@ -105,6 +106,7 @@ class CartesianTargetGuard:
         self.max_position_speed_m_s = float(max_position_speed_m_s)
         self.max_rotation_step_rad = float(max_rotation_step_rad)
         self.max_rotation_speed_rad_s = float(max_rotation_speed_rad_s)
+        self.guard_rotation = bool(guard_rotation)
         self.position_deadband_m = float(position_deadband_m)
         self.position_filter_tau_s = float(position_filter_tau_s)
         self.max_output_speed_m_s = float(max_output_speed_m_s)
@@ -209,7 +211,7 @@ class CartesianTargetGuard:
             position_step_m = _distance(position, self._last_input_position)
             if input_gap_ms is not None and input_gap_ms > 0:
                 position_speed_m_s = position_step_m / (input_gap_ms / 1000.0)
-        if self._last_input_rotation is not None:
+        if self.guard_rotation and self._last_input_rotation is not None:
             rotation_step_rad = _rotation_distance(rotation, self._last_input_rotation)
 
         session_changed = bool(

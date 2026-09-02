@@ -155,6 +155,27 @@ def test_target_guard_rejects_reacquisition_jump_and_reanchors() -> None:
     assert recovered.reanchored is True
 
 
+def test_target_guard_skips_rotation_checks_when_rotation_is_not_controlled() -> None:
+    guard = CartesianTargetGuard(recovery_frames=1, guard_rotation=False)
+    first = guard.update(target(1), now_monotonic_ns=100)
+    rotated = TeleopTarget.from_dict(
+        {
+            **target(2).to_dict(),
+            "rotation": [
+                [-1.0, 0.0, 0.0],
+                [0.0, -1.0, 0.0],
+                [0.0, 0.0, 1.0],
+            ],
+        }
+    )
+    second = guard.update(rotated, now_monotonic_ns=100)
+
+    assert first.ready is True
+    assert second.ready is True
+    assert second.reason == "tracking_ready"
+    assert second.rotation_step_rad is None
+
+
 def test_target_guard_fails_closed_for_invalid_and_stale_samples() -> None:
     guard = CartesianTargetGuard(recovery_frames=1, max_target_age_ms=100.0)
     now = 3_000_000_000
