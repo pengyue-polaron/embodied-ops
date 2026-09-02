@@ -25,6 +25,9 @@ python -m pip install "embodied-ops[huggingface]"
 
 # Shared LeRobot v3 validation and v3-to-v2.1 conversion
 python -m pip install "embodied-ops[lerobot-dataset]"
+
+# Source-neutral Cartesian teleoperation over ZeroMQ
+python -m pip install "embodied-ops[teleop-zmq]"
 ```
 
 ## Scope
@@ -37,6 +40,7 @@ python -m pip install "embodied-ops[lerobot-dataset]"
 | Evaluation | Stable task/repetition plans, deterministic run slots, and portable progress summaries |
 | Artifacts | Atomic publication, exact manifests, verified Hugging Face retrieval, contract digests, and pinned code environments |
 | Operator Panel | Versioned catalog, form, event, and workflow-status schemas; packaged shadcn/ui Web presentation; minimal repository adapters; normalized camera health; exclusive owned-process supervision; guarded input; typed progress; and format-driven document creation |
+| Teleoperation | Source-neutral Cartesian target and action-aligned feedback schemas; lossy latest-state PUB/SUB; acknowledged, idempotent operator commands; and shared frame-mapping geometry |
 | Dataset interoperability | LeRobot v3 payload-graph validation and a format-only v3-to-v2.1 builder; Runtime callers supply robot task, feature, statistics, and provenance constraints |
 
 The package owns cross-robot operational mechanics only. Robot repositories
@@ -94,6 +98,21 @@ send input or start work.
 The supervisor owns the launched workflow process group and terminates it if
 the panel server disappears, preventing an apparently stopped control surface
 from leaving its child process running.
+
+## Teleoperation boundary
+
+`embodied_ops.teleop` defines the common vocabulary between an input-device
+adapter, a simulator/robot backend, and read-only observers. It deliberately
+does not parse a Quest APK, load calibration profiles, map targets into native
+actions, or decide whether motion is safe. The source publishes the newest
+calibrated Cartesian target; each backend owns its watchdog, workspace limits,
+native action, recorder, and command acknowledgement.
+
+The optional `teleop-zmq` transport uses PUB/SUB for targets and feedback,
+where dropping stale intermediate frames is desirable. Operator commands use
+DEALER/ROUTER and return a versioned `TeleopCommandResult`; a UI must not report
+success merely because it sent a request. Duplicate request IDs replay the
+cached result without applying an action twice.
 
 The Web source lives under `web/` as a Vite + React + TypeScript application.
 It uses checked-in shadcn/ui components and compiles to the dependency-free

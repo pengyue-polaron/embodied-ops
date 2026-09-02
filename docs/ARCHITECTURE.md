@@ -12,6 +12,7 @@ semantics across multiple robot integrations. It is not a universal robot API.
 | Operational status | Versioned workflow snapshots, lifecycle states, revisions, guarded-input visibility, and owned-process termination | Native telemetry mapping, field sanitization, network exposure, and any control transport |
 | Artifacts | Atomic publication, digests, verified provider retrieval and pinned code environments | Artifact identity, model policy, credentials and retention |
 | Timing | Freshness, pair-skew and portable progress contracts | Sensor clocks, capture ownership and acceptable limits |
+| Cartesian teleoperation | Source-neutral target/feedback/command schemas, frame geometry, latest-state transport, and idempotent command acknowledgement | Device protocol, calibration, native action mapping, stale/workspace/safety policy, cameras, and recording |
 | Dataset interoperability | Shared format readers, validators and conversions proven by at least two integrations | Robot feature schema, task policy, provenance, collection and derivative configuration |
 | Hardware | Nothing | Drivers, ROS/CAN/cameras, command leases, safety limits, calibration and reset |
 
@@ -21,16 +22,19 @@ only when the corresponding feature is used.
 
 ## Current scope
 
-Version 0.8 implements the operator-workflow, artifact, timing, task,
+Version 0.9 implements the operator-workflow, artifact, timing, task,
 evaluation, Operator Panel, and dataset-interoperability rows above. The shared
 dataset module validates LeRobot v3 metadata/payload graphs and builds the
 format-only portion of v2.1 derivatives. Galaxea A1 and VLAI L1 provide the
 robot feature requirements, task/provenance checks, publication transaction,
 and robot-specific derivative metadata around that engine.
 
-Local robot transports are not currently a public `embodied-ops` contract.
+General-purpose local robot transports are not a public `embodied-ops` contract.
 The experimental generic RPC API released in 0.2 was removed in 0.3 before the
-workflow boundary stabilized. A transport may return only after at least two
+workflow boundary stabilized. The narrow Cartesian teleoperation data plane is
+an exception proven by independent ManiSkill and MuJoCo backends: it exchanges
+operator intent and action-aligned observation, but it does not expose a robot
+driver, lease, or hardware lifecycle. A broader transport may return only after at least two
 operational Runtime implementations demonstrate the same manifest, session,
 lease and fail-closed semantics. Until then, robot-specific protocols stay with
 their Runtime repository.

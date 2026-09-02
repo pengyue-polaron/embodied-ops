@@ -1,6 +1,6 @@
 [project]
 name = "embodied-ops"
-version = "0.8.0"
+version = "0.9.0"
 description = "Hardware-independent operational workflows for embodied AI"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,6 +22,7 @@ dependencies = []
 
 [project.optional-dependencies]
 huggingface = ["huggingface-hub>=1.0.0,<2.0.0"]
+teleop-zmq = ["pyzmq>=26"]
 lerobot-dataset = [
     "numpy>=1.24",
     "pandas>=2.0",

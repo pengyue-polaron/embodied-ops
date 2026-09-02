@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Add dependency-free, hardware-neutral Cartesian teleoperation contracts and
+  geometry helpers proven by ManiSkill and MuJoCo adapters.
+- Add an optional ZeroMQ data plane with lossy latest-state PUB/SUB streams and
+  acknowledged, idempotent DEALER/ROUTER operator commands.
+- Launch the Operator Panel process-group supervisor by its installed path so
+  workflows do not emit a `runpy` module-preload warning.
+
 ## 0.7.0
 
 - Add shared hardware-independent validation for complete LeRobot v3 dataset
