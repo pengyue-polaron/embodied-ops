@@ -23,7 +23,7 @@ only when the corresponding feature is used.
 
 ## Current scope
 
-Version 0.9 implements the operator-workflow, artifact, timing, task,
+Version 0.10 implements the operator-workflow, artifact, timing, task,
 evaluation, Operator Panel, Foxglove-presentation, and dataset-interoperability
 rows above. The shared
 dataset module validates LeRobot v3 metadata/payload graphs and builds the

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.10.0
+
+- Add the canonical ZMQ-to-Foxglove gateway, compact React controls, and
+  organization-layout publisher.
+- Add source-neutral managed-session supervision for backend-owned teleoperation
+  entry points.
+
 ## 0.9.0
 
 - Add the robot-neutral Foxglove Collection Console with versioned, layout-

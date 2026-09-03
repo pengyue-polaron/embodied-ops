@@ -1,0 +1,272 @@
+:root {
+  color-scheme: light dark;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+button {
+  font: inherit;
+}
+
+.teleop-panel {
+  --panel-fg: light-dark(#17181a, #f3f4f6);
+  --panel-muted: light-dark(#686d76, #9298a2);
+  --panel-border: light-dark(#d8dade, #3b3f46);
+  --button-bg: light-dark(#ffffff, #24272c);
+  --button-hover: light-dark(#f0f1f3, #30343a);
+  --primary-bg: light-dark(#17181a, #f3f4f6);
+  --primary-fg: light-dark(#ffffff, #17181a);
+  --danger: light-dark(#b4232c, #ff6b72);
+  --ok: light-dark(#16825d, #52d6a0);
+  --warn: light-dark(#9a6500, #f4c152);
+
+  container-type: inline-size;
+  display: flex;
+  min-height: 100%;
+  width: 100%;
+  flex-direction: column;
+  overflow: auto;
+  padding: 12px;
+  color: var(--panel-fg);
+  touch-action: manipulation;
+}
+
+.teleop-status {
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--button-bg) 88%, transparent);
+  padding: 11px;
+}
+
+.teleop-status-headline {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+}
+
+.teleop-status-headline strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teleop-status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--panel-muted);
+}
+
+.teleop-status-dot--ok {
+  background: var(--ok);
+}
+
+.teleop-status-dot--warn,
+.teleop-status-dot--stale {
+  background: var(--warn);
+}
+
+.teleop-status-dot--error {
+  background: var(--danger);
+}
+
+.teleop-recording {
+  margin-left: auto;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 6px;
+  text-transform: uppercase;
+}
+
+.teleop-facts {
+  display: grid;
+  margin: 10px 0 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.teleop-facts div {
+  min-width: 0;
+}
+
+.teleop-facts dt {
+  color: var(--panel-muted);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.teleop-facts dd {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teleop-position {
+  margin-top: 9px;
+  overflow: hidden;
+  color: var(--panel-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teleop-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.teleop-group {
+  display: grid;
+  min-width: 0;
+  align-items: center;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 7px;
+}
+
+.teleop-group-label {
+  margin: 0;
+  color: var(--panel-muted);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.teleop-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.teleop-group:first-child .teleop-buttons {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.teleop-button {
+  min-height: 34px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--button-bg);
+  color: var(--panel-fg);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.1;
+  padding: 8px 9px;
+  transition:
+    background 100ms ease,
+    border-color 100ms ease,
+    color 100ms ease,
+    opacity 100ms ease;
+  white-space: nowrap;
+}
+
+.teleop-button:hover:not(:disabled) {
+  background: var(--button-hover);
+}
+
+.teleop-button:focus-visible {
+  outline: 2px solid var(--panel-fg);
+  outline-offset: 2px;
+}
+
+.teleop-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.teleop-button--primary {
+  border-color: var(--primary-bg);
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+}
+
+.teleop-button--primary:hover:not(:disabled) {
+  opacity: 0.82;
+}
+
+.teleop-button--danger {
+  border-color: color-mix(in srgb, var(--danger) 66%, transparent);
+  color: var(--danger);
+}
+
+.teleop-button--danger:hover:not(:disabled) {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.teleop-notice {
+  min-height: 18px;
+  overflow: hidden;
+  padding-top: 8px;
+  color: var(--panel-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teleop-notice--ok::before,
+.teleop-notice--error::before {
+  margin-right: 5px;
+  content: "●";
+}
+
+.teleop-notice--ok::before {
+  color: #42b883;
+}
+
+.teleop-notice--error {
+  color: var(--danger);
+}
+
+@container (max-width: 340px) {
+  .teleop-group {
+    grid-template-columns: 1fr;
+  }
+
+  .teleop-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .teleop-group:first-child .teleop-buttons {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .teleop-button {
+    transition: none;
+  }
+}

@@ -1,6 +1,6 @@
 [project]
 name = "embodied-ops"
-version = "0.9.0"
+version = "0.10.0"
 description = "Hardware-independent operational workflows for embodied AI"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,11 +23,16 @@ dependencies = []
 [project.optional-dependencies]
 huggingface = ["huggingface-hub>=1.0.0,<2.0.0"]
 teleop-zmq = ["pyzmq>=26"]
+teleop-foxglove = ["pyzmq>=26", "foxglove-sdk>=0.27,<0.28", "websockets>=15,<18"]
 lerobot-dataset = [
     "numpy>=1.24",
     "pandas>=2.0",
     "pyarrow>=14.0",
 ]
+
+[project.scripts]
+embodied-teleop-foxglove = "embodied_ops.teleop.foxglove_bridge:main"
+embodied-foxglove-publish = "embodied_ops.foxglove_publish:main"
 
 [project.urls]
 Homepage = "https://github.com/pengyue-polaron/embodied-ops"

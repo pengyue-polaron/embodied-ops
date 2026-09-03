@@ -1,0 +1,73 @@
+name: Publish Foxglove operator UI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-foxglove.yml"
+      - "foxglove/quest-teleop-controls/**"
+      - "foxglove/quest_teleop.foxglove-layout.json"
+      - "src/embodied_ops/foxglove_publish.py"
+      - "src/embodied_ops/teleop/foxglove_bridge.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-foxglove-operator-ui
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: foxglove/quest-teleop-controls
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: foxglove/quest-teleop-controls/package-lock.json
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify publisher
+        working-directory: .
+        run: |
+          python -m pip install -e ".[teleop-foxglove]" pytest
+          python -m pytest -q tests/test_foxglove_publish.py
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify extension
+        run: |
+          npm run typecheck
+          npm run lint
+          npm audit
+
+      - name: Package extension
+        run: npm run package
+
+      - name: Upload .foxe artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: quest-teleop-controls
+          path: foxglove/quest-teleop-controls/*.foxe
+          if-no-files-found: error
+
+      - name: Publish extension and organization layout
+        env:
+          FOXGLOVE_API_KEY: ${{ secrets.FOXGLOVE_API_KEY }}
+          PYTHONPATH: src
+        working-directory: .
+        run: |
+          test -n "$FOXGLOVE_API_KEY"
+          extension_path=$(find foxglove/quest-teleop-controls -maxdepth 1 -name '*.foxe' -print -quit)
+          python -m embodied_ops.foxglove_publish --extension "$extension_path"

@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e ".[lerobot-dataset,teleop-zmq]" pytest ruff build
+      - run: python -m pip install -e ".[lerobot-dataset,teleop-foxglove]" pytest ruff build
       - run: python -m pytest
       - run: ruff check .
       - run: ruff format --check .
@@ -41,3 +41,23 @@ jobs:
       - run: npm run build
         working-directory: web
       - run: git diff --exit-code -- src/embodied_ops/operator_panel/assets
+
+  teleop-foxglove:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: foxglove/quest-teleop-controls/package-lock.json
+      - run: npm ci
+        working-directory: foxglove/quest-teleop-controls
+      - run: npm run typecheck
+        working-directory: foxglove/quest-teleop-controls
+      - run: npm run lint
+        working-directory: foxglove/quest-teleop-controls
+      - run: npm audit --audit-level=high
+        working-directory: foxglove/quest-teleop-controls
+      - run: npm run package
+        working-directory: foxglove/quest-teleop-controls
