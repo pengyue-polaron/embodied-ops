@@ -143,11 +143,12 @@ success merely because it sent a request. Duplicate request IDs replay the
 cached result without applying an action twice.
 
 The optional `teleop-foxglove` extra owns the source-neutral WebSocket gateway,
-protocol probe, React controls, and organization layout. It consumes only the
+protocol probe, and React controls. It consumes only the
 canonical target/status/feedback/command contracts and contains no Quest APK,
 ADB, calibration, simulator, or native-action logic. Run the gateway with
 `embodied-teleop-foxglove`; backend repositories decide when to compose it with
-an input source and their own runtime.
+an input source and their own runtime. Each backend repository owns, publishes,
+and explicitly selects its Foxglove organization layout.
 
 Backend recorders write `embodied.teleop_step/v1` rows and publish an
 `embodied.teleop_episode/v1` manifest last. The manifest is the completion

@@ -62,7 +62,7 @@ COMMAND_TIMEOUT_MS = {
     TeleopCommandName.NEXT_EPISODE.value: 30_000,
 }
 
-DEFAULT_FOXGLOVE_LAYOUT_ID = "lay_0eaTLQSSPmExnWfB"
+DEFAULT_FOXGLOVE_LAYOUT_ID = ""
 
 TELEMETRY_SCHEMA = {
     "type": "object",

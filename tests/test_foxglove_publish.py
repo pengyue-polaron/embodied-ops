@@ -54,7 +54,7 @@ class FakeApi:
         ]
 
     def update_layout(self, layout_id: str, *, name: str, data: dict) -> dict:
-        assert name == "ForceVLA Teleop"
+        assert name == "Unit Teleop"
         self.layout_data = data
         return {"id": layout_id, "updatedAt": "2026-09-02T12:00:00Z"}
 
@@ -99,7 +99,13 @@ def test_publishes_extension_before_layout_and_verifies_both(tmp_path: Path) -> 
     layout.write_text('{"layout":{"direction":"row"}}', encoding="utf-8")
     api = FakeApi()
 
-    result = publish_assets(api, extension=extension, layout=layout, layout_id="lay_test")
+    result = publish_assets(
+        api,
+        extension=extension,
+        layout=layout,
+        layout_id="lay_test",
+        layout_name="Unit Teleop",
+    )
 
     assert result.extension_id == "ext_123"
     assert result.layout_id == "lay_test"
@@ -116,9 +122,19 @@ def test_repeated_publish_accepts_the_same_active_version(tmp_path: Path) -> Non
         extension=extension,
         layout=layout,
         layout_id="lay_test",
+        layout_name="Unit Teleop",
     )
 
     assert result.extension_version == "1.0.0"
+
+
+def test_shared_extension_can_publish_without_a_backend_layout(tmp_path: Path) -> None:
+    extension = make_extension(tmp_path / "controls.foxe")
+
+    result = publish_assets(FakeApi(), extension=extension)
+
+    assert result.extension_id == "ext_123"
+    assert result.layout_id is None
 
 
 def test_react_panel_exposes_every_bridge_service() -> None:

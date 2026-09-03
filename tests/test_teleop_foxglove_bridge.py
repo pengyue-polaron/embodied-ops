@@ -1,13 +1,11 @@
 import json
 import subprocess
-from pathlib import Path
 
 from embodied_ops.teleop import TeleopCommandResult, TeleopFeedback, TeleopTarget
 from foxglove.messages import PoseInFrame
 from websockets.sync.client import connect
 
 from embodied_ops.teleop.foxglove_bridge import (
-    DEFAULT_FOXGLOVE_LAYOUT_ID,
     SERVICE_COMMANDS,
     CommandRouter,
     FoxgloveTeleopBridge,
@@ -85,50 +83,6 @@ def test_feedback_is_flattened_for_foxglove_plots() -> None:
     assert telemetry["force_z_N"] == 3.0
     assert telemetry["torque_y_Nm"] == 0.2
     assert telemetry["wrench_bias_ready"] is True
-
-
-def test_layout_uses_compact_force_and_torque_plots() -> None:
-    path = Path(__file__).resolve().parents[1] / "foxglove" / "quest_teleop.foxglove-layout.json"
-    layout = json.loads(path.read_text(encoding="utf-8"))
-    configs = layout["configById"]
-    assert "3D!quest-eef" not in configs
-    assert {item["value"] for item in configs["Plot!wrist-force"]["paths"]} == {
-        "/teleop/telemetry.force_x_N",
-        "/teleop/telemetry.force_y_N",
-        "/teleop/telemetry.force_z_N",
-        "/teleop/telemetry.force_norm_N",
-    }
-    assert {item["value"] for item in configs["Plot!wrist-torque"]["paths"]} == {
-        "/teleop/telemetry.torque_x_Nm",
-        "/teleop/telemetry.torque_y_Nm",
-        "/teleop/telemetry.torque_z_Nm",
-        "/teleop/telemetry.torque_norm_Nm",
-    }
-    root = layout["layout"]
-    assert root["splitPercentage"] == 76
-    assert root["first"]["first"] == {
-        "direction": "row",
-        "first": "Image!quest-agent",
-        "second": "Image!quest-wrist",
-        "splitPercentage": 50,
-    }
-    assert root["first"]["second"]["first"] == "Plot!wrist-force"
-    assert root["first"]["second"]["second"] == "Plot!wrist-torque"
-    assert root["second"] == {
-        "direction": "column",
-        "first": "DiagnosticStatusPanel!teleop-controller",
-        "second": "quest-teleop-controls.controls!quest-controls",
-        "splitPercentage": 32,
-    }
-    assert configs["DiagnosticStatusPanel!teleop-controller"] == {
-        "selectedHardwareId": "quest-teleop",
-        "selectedName": "Teleop/Controller",
-        "splitFraction": 0.35,
-        "topicToRender": "/teleop/diagnostics",
-        "numericPrecision": 3,
-        "secondsUntilStale": 1,
-        "foxglovePanelTitle": "Controller status",
-    }
 
 
 def test_pose_message_uses_foxglove_vector_position() -> None:
@@ -487,16 +441,23 @@ def test_diagnostics_mark_missing_source_as_stale() -> None:
     assert status["message"] == "Disconnected"
 
 
-def test_deep_link_selects_organization_layout_and_local_bridge() -> None:
+def test_deep_link_omits_layout_until_a_backend_selects_one() -> None:
     link = foxglove_deep_link(
         websocket_url="ws://127.0.0.1:8765",
-        layout_id=DEFAULT_FOXGLOVE_LAYOUT_ID,
     )
     assert link.startswith("https://app.foxglove.dev/~/view?")
     assert "ds=foxglove-websocket" in link
     assert "ds.url=ws%3A%2F%2F127.0.0.1%3A8765" in link
-    assert f"layoutId={DEFAULT_FOXGLOVE_LAYOUT_ID}" in link
+    assert "layoutId=" not in link
     assert "openIn=desktop" in link
+
+
+def test_deep_link_selects_the_backend_layout() -> None:
+    link = foxglove_deep_link(
+        websocket_url="ws://127.0.0.1:8765",
+        layout_id="lay_backend",
+    )
+    assert "layoutId=lay_backend" in link
 
 
 def test_open_foxglove_always_opens_the_exact_deep_link(monkeypatch) -> None:

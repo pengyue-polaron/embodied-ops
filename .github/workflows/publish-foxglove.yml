@@ -7,9 +7,7 @@ on:
     paths:
       - ".github/workflows/publish-foxglove.yml"
       - "foxglove/quest-teleop-controls/**"
-      - "foxglove/quest_teleop.foxglove-layout.json"
       - "src/embodied_ops/foxglove_publish.py"
-      - "src/embodied_ops/teleop/foxglove_bridge.py"
 
 permissions:
   contents: read
@@ -62,7 +60,7 @@ jobs:
           path: foxglove/quest-teleop-controls/*.foxe
           if-no-files-found: error
 
-      - name: Publish extension and organization layout
+      - name: Publish shared extension
         env:
           FOXGLOVE_API_KEY: ${{ secrets.FOXGLOVE_API_KEY }}
           PYTHONPATH: src

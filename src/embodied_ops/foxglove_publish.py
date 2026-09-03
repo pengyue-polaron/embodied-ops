@@ -18,8 +18,6 @@ from pathlib import Path
 from typing import Any
 
 API_BASE = "https://api.foxglove.dev/v1"
-DEFAULT_LAYOUT_ID = "lay_0eaTLQSSPmExnWfB"
-DEFAULT_LAYOUT_NAME = "ForceVLA Teleop"
 _DETERMINISTIC_ZIP_TIMESTAMP = (2021, 2, 3, 0, 0, 0)
 
 
@@ -43,8 +41,8 @@ class ExtensionManifest:
 class PublishResult:
     extension_id: str
     extension_version: str
-    layout_id: str
-    layout_updated_at: str
+    layout_id: str | None
+    layout_updated_at: str | None
 
 
 class FoxgloveApi:
@@ -247,16 +245,23 @@ def publish_assets(
     api: FoxgloveApi,
     *,
     extension: Path,
-    layout: Path,
-    layout_id: str = DEFAULT_LAYOUT_ID,
-    layout_name: str = DEFAULT_LAYOUT_NAME,
+    layout: Path | None = None,
+    layout_id: str = "",
+    layout_name: str = "",
 ) -> PublishResult:
     normalize_extension_archive(extension)
     manifest = read_extension_manifest(extension)
     extension_sha256 = hashlib.sha256(extension.read_bytes()).hexdigest()
-    layout_data = json.loads(layout.read_text(encoding="utf-8"))
-    if not isinstance(layout_data, dict):
-        raise TypeError("Foxglove layout must contain a JSON object")
+    layout_data = None
+    if layout is None:
+        if layout_id or layout_name:
+            raise ValueError("--layout-id and --layout-name require --layout")
+    else:
+        if not layout_id or not layout_name:
+            raise ValueError("layout publication requires a layout ID and name")
+        layout_data = json.loads(layout.read_text(encoding="utf-8"))
+        if not isinstance(layout_data, dict):
+            raise TypeError("Foxglove layout must contain a JSON object")
 
     try:
         upload = api.upload_extension(extension)
@@ -280,41 +285,40 @@ def publish_assets(
         if not isinstance(extension_id, str) or not extension_id:
             raise TypeError("Foxglove extension listing omitted its id")
 
-    try:
-        updated = api.update_layout(layout_id, name=layout_name, data=layout_data)
-    except (FoxgloveApiError, RuntimeError) as error:
-        raise RuntimeError(
-            "extension upload succeeded but layout publication failed; "
-            "rerun the same version to finish the idempotent publication"
-        ) from error
-
     _wait_for_active_extension(
         api,
         manifest=manifest,
         sha256=extension_sha256,
     )
-    _wait_for_layout(api, layout_id=layout_id, layout_data=layout_data)
+
+    updated = None
+    if layout_data is not None:
+        try:
+            updated = api.update_layout(layout_id, name=layout_name, data=layout_data)
+        except (FoxgloveApiError, RuntimeError) as error:
+            raise RuntimeError(
+                "extension upload succeeded but layout publication failed; "
+                "rerun the same version to finish the idempotent publication"
+            ) from error
+        _wait_for_layout(api, layout_id=layout_id, layout_data=layout_data)
 
     return PublishResult(
         extension_id=extension_id,
         extension_version=manifest.version,
-        layout_id=str(updated.get("id", layout_id)),
-        layout_updated_at=str(updated.get("updatedAt", "")),
+        layout_id=None if updated is None else str(updated.get("id", layout_id)),
+        layout_updated_at=None if updated is None else str(updated.get("updatedAt", "")),
     )
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Publish and verify a .foxe extension, then update the organization layout."
-    )
+    parser = argparse.ArgumentParser(description="Publish and verify the shared .foxe extension.")
     parser.add_argument("--extension", type=Path, required=True)
     parser.add_argument(
         "--layout",
         type=Path,
-        default=Path("foxglove/quest_teleop.foxglove-layout.json"),
     )
-    parser.add_argument("--layout-id", default=DEFAULT_LAYOUT_ID)
-    parser.add_argument("--layout-name", default=DEFAULT_LAYOUT_NAME)
+    parser.add_argument("--layout-id", default="")
+    parser.add_argument("--layout-name", default="")
     return parser.parse_args(argv)
 
 
@@ -342,10 +346,10 @@ def main(argv: list[str] | None = None) -> int:
         print(str(error), file=sys.stderr)
         return 1
 
-    print(
-        f"Published extension {result.extension_id} v{result.extension_version} "
-        f"and layout {result.layout_id} ({result.layout_updated_at})"
-    )
+    message = f"Published extension {result.extension_id} v{result.extension_version}"
+    if result.layout_id is not None:
+        message += f" and layout {result.layout_id} ({result.layout_updated_at})"
+    print(message)
     return 0
 
 
