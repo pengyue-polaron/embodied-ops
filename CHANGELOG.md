@@ -2,14 +2,13 @@
 
 ## Unreleased
 
+## 0.9.0
+
 - Add the robot-neutral Foxglove Collection Console with versioned, layout-
   supplied topic/service configuration.
 - Add dependency-free Foxglove status sanitization, guarded-action validation,
   panel-state builders, and fail-closed organization layout upserts for Runtime
   repositories.
-
-## 0.9.0
-
 - Add dependency-free, hardware-neutral Cartesian teleoperation contracts and
   geometry helpers proven by ManiSkill and MuJoCo adapters.
 - Add an optional ZeroMQ data plane with lossy latest-state PUB/SUB streams and
