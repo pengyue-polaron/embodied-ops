@@ -19,7 +19,7 @@ from typing import Any
 
 API_BASE = "https://api.foxglove.dev/v1"
 DEFAULT_LAYOUT_ID = "lay_0eaTLQSSPmExnWfB"
-DEFAULT_LAYOUT_NAME = "Quest Unified Teleop"
+DEFAULT_LAYOUT_NAME = "ForceVLA Teleop"
 _DETERMINISTIC_ZIP_TIMESTAMP = (2021, 2, 3, 0, 0, 0)
 
 

@@ -54,7 +54,7 @@ class FakeApi:
         ]
 
     def update_layout(self, layout_id: str, *, name: str, data: dict) -> dict:
-        assert name == "Quest Unified Teleop"
+        assert name == "ForceVLA Teleop"
         self.layout_data = data
         return {"id": layout_id, "updatedAt": "2026-09-02T12:00:00Z"}
 
