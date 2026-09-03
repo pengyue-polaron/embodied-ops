@@ -28,120 +28,21 @@ button {
   --primary-bg: light-dark(#17181a, #f3f4f6);
   --primary-fg: light-dark(#ffffff, #17181a);
   --danger: light-dark(#b4232c, #ff6b72);
-  --ok: light-dark(#16825d, #52d6a0);
-  --warn: light-dark(#9a6500, #f4c152);
-
   container-type: inline-size;
   display: flex;
   min-height: 100%;
   width: 100%;
   flex-direction: column;
   overflow: auto;
-  padding: 12px;
+  padding: 10px;
   color: var(--panel-fg);
   touch-action: manipulation;
-}
-
-.teleop-status {
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--button-bg) 88%, transparent);
-  padding: 11px;
-}
-
-.teleop-status-headline {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-}
-
-.teleop-status-headline strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.teleop-status-dot {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  border-radius: 999px;
-  background: var(--panel-muted);
-}
-
-.teleop-status-dot--ok {
-  background: var(--ok);
-}
-
-.teleop-status-dot--warn,
-.teleop-status-dot--stale {
-  background: var(--warn);
-}
-
-.teleop-status-dot--error {
-  background: var(--danger);
-}
-
-.teleop-recording {
-  margin-left: auto;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
-  color: var(--danger);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  padding: 3px 6px;
-  text-transform: uppercase;
-}
-
-.teleop-facts {
-  display: grid;
-  margin: 10px 0 0;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 12px;
-}
-
-.teleop-facts div {
-  min-width: 0;
-}
-
-.teleop-facts dt {
-  color: var(--panel-muted);
-  font-size: 9px;
-  font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.teleop-facts dd {
-  margin: 2px 0 0;
-  overflow: hidden;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.teleop-position {
-  margin-top: 9px;
-  overflow: hidden;
-  color: var(--panel-muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .teleop-groups {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 10px;
 }
 
 .teleop-group {

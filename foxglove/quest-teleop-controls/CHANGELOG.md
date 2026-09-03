@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0
+
+- Reduce the panel to acknowledged control buttons only; connection and source
+  health stay in Foxglove Diagnostics.
+- Accept the canonical source state while the gateway keeps cached 1.1 clients
+  working during desktop extension refresh.
+
 ## 1.2.0
 
 - Move canonical teleoperation presentation ownership into `embodied-ops`.

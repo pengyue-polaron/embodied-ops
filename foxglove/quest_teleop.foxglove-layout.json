@@ -64,8 +64,17 @@
       "xAxisVal": "timestamp",
       "foxglovePanelTitle": "Wrist torque (N·m)"
     },
+    "DiagnosticStatusPanel!teleop-controller": {
+      "selectedHardwareId": "quest-teleop",
+      "selectedName": "Teleop/Controller",
+      "splitFraction": 0.35,
+      "topicToRender": "/teleop/diagnostics",
+      "numericPrecision": 3,
+      "secondsUntilStale": 1,
+      "foxglovePanelTitle": "Controller status"
+    },
     "quest-teleop-controls.controls!quest-controls": {
-      "foxglovePanelTitle": "Teleop"
+      "foxglovePanelTitle": "Controls"
     }
   },
   "globalVariables": {},
@@ -90,7 +99,12 @@
       },
       "splitPercentage": 50
     },
-    "second": "quest-teleop-controls.controls!quest-controls",
+    "second": {
+      "direction": "column",
+      "first": "DiagnosticStatusPanel!teleop-controller",
+      "second": "quest-teleop-controls.controls!quest-controls",
+      "splitPercentage": 32
+    },
     "splitPercentage": 76
   }
 }

@@ -152,6 +152,9 @@ OPERATOR_STATE_SCHEMA = {
         "status": {"type": "string"},
         "severity": {"type": "string", "enum": ["ok", "warn", "error", "stale"]},
         "source": {"type": "string"},
+        # Kept for desktop clients that cached extension 1.1 before the generic
+        # source label was introduced. New clients render ``source`` only.
+        "quest": {"type": "string"},
         "controller": {"type": "string"},
         "backend": {"type": "string"},
         "view": {"type": "string"},
@@ -212,7 +215,8 @@ def _diagnostic_status(
         "level": level,
         "name": name,
         "message": message,
-        "hardware_id": "canonical-teleop",
+        # Preserve the stable selector used by existing Foxglove layouts.
+        "hardware_id": "quest-teleop",
         "values": _values(values),
     }
 
@@ -415,6 +419,7 @@ def operator_state(
         "status": str(diagnostics["message"]),
         "severity": severity,
         "source": source_label,
+        "quest": source_label,
         "controller": controller,
         "backend": backend,
         "view": view,

@@ -11,16 +11,7 @@ type CommandResponse = {
 };
 
 type OperatorState = {
-  status: string;
-  severity: "ok" | "warn" | "error" | "stale";
-  source: string;
-  controller: string;
-  backend: string;
-  view: string;
-  controller_position_m: number[] | null;
-  gate_open: boolean;
   recording: boolean;
-  episode_id: string | null;
 };
 
 const OPERATOR_STATE_TOPIC = "/teleop/operator_state";
@@ -128,25 +119,10 @@ function asOperatorState(value: unknown): OperatorState | undefined {
     return undefined;
   }
   const state = value as Partial<OperatorState>;
-  if (
-    typeof state.status !== "string" ||
-    typeof state.source !== "string" ||
-    typeof state.controller !== "string" ||
-    typeof state.backend !== "string" ||
-    typeof state.view !== "string" ||
-    typeof state.recording !== "boolean"
-  ) {
+  if (typeof state.recording !== "boolean") {
     return undefined;
   }
   return state as OperatorState;
-}
-
-function positionText(position: number[] | null | undefined): string {
-  if (position?.length !== 3) {
-    return "Position unavailable";
-  }
-  const format = (value: number): string => `${value >= 0 ? "+" : ""}${value.toFixed(3)}`;
-  return `x ${format(position[0]!)}  y ${format(position[1]!)}  z ${format(position[2]!)}`;
 }
 
 function TeleopControls({ context }: { context: PanelExtensionContext }): ReactElement {
@@ -208,10 +184,6 @@ function TeleopControls({ context }: { context: PanelExtensionContext }): ReactE
   }, []);
 
   const connected = lastStateAt > 0 && now - lastStateAt <= 1500;
-  const displayState = connected ? operatorState : undefined;
-  const status = displayState?.status ?? (lastStateAt > 0 ? "Disconnected" : "Connecting…");
-  const severity = displayState?.severity ?? (lastStateAt > 0 ? "error" : "stale");
-
   const enabledControls = useMemo(() => {
     if (!connected || operatorState == undefined) {
       return new Set<string>();
@@ -261,32 +233,6 @@ function TeleopControls({ context }: { context: PanelExtensionContext }): ReactE
 
   return (
     <div className="teleop-panel" aria-busy={pending != undefined}>
-      <section className="teleop-status" aria-live="polite">
-        <div className="teleop-status-headline">
-          <span className={`teleop-status-dot teleop-status-dot--${severity}`} aria-hidden="true" />
-          <strong>{status}</strong>
-          {displayState?.recording === true ? <span className="teleop-recording">Recording</span> : null}
-        </div>
-        <dl className="teleop-facts">
-          <div>
-            <dt>Source</dt>
-            <dd>{displayState?.source ?? "—"}</dd>
-          </div>
-          <div>
-            <dt>Controller</dt>
-            <dd>{displayState?.controller ?? "—"}</dd>
-          </div>
-          <div>
-            <dt>Backend</dt>
-            <dd>{displayState?.backend ?? "—"}</dd>
-          </div>
-          <div>
-            <dt>View</dt>
-            <dd>{displayState?.view ?? "—"}</dd>
-          </div>
-        </dl>
-        <div className="teleop-position">{positionText(displayState?.controller_position_m)}</div>
-      </section>
       <div className="teleop-groups">
         {CONTROL_GROUPS.map((group) => (
           <section className="teleop-group" key={group.label}>

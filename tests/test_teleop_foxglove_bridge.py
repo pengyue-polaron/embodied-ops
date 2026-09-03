@@ -114,7 +114,21 @@ def test_layout_uses_compact_force_and_torque_plots() -> None:
     }
     assert root["first"]["second"]["first"] == "Plot!wrist-force"
     assert root["first"]["second"]["second"] == "Plot!wrist-torque"
-    assert root["second"] == "quest-teleop-controls.controls!quest-controls"
+    assert root["second"] == {
+        "direction": "column",
+        "first": "DiagnosticStatusPanel!teleop-controller",
+        "second": "quest-teleop-controls.controls!quest-controls",
+        "splitPercentage": 32,
+    }
+    assert configs["DiagnosticStatusPanel!teleop-controller"] == {
+        "selectedHardwareId": "quest-teleop",
+        "selectedName": "Teleop/Controller",
+        "splitFraction": 0.35,
+        "topicToRender": "/teleop/diagnostics",
+        "numericPrecision": 3,
+        "secondsUntilStale": 1,
+        "foxglovePanelTitle": "Controller status",
+    }
 
 
 def test_pose_message_uses_foxglove_vector_position() -> None:
@@ -185,7 +199,7 @@ def test_diagnostics_explain_tracking_loss_and_safe_hold() -> None:
     assert status["name"] == "Teleop/Controller"
     assert status["level"] == 1
     assert status["message"] == "Controller tracking unavailable"
-    assert status["hardware_id"] == "canonical-teleop"
+    assert status["hardware_id"] == "quest-teleop"
     assert status["values"] == [
         {"key": "Streaming", "value": "ON · B pressed"},
         {"key": "Controller pose (m)", "value": "Unavailable"},
@@ -287,6 +301,7 @@ def test_operator_state_summarizes_backend_and_view_latency() -> None:
         "status": "Streaming",
         "severity": "ok",
         "source": "Quest · Online",
+        "quest": "Quest · Online",
         "controller": "Streaming",
         "backend": "forcevla_mujoco · 20 Hz",
         "view": "Live · 72 ms",
