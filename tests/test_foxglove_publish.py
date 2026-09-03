@@ -7,6 +7,7 @@ from pathlib import Path
 from embodied_ops.foxglove_publish import (
     ExtensionManifest,
     FoxgloveApiError,
+    normalize_extension_archive,
     publish_assets,
     read_extension_manifest,
 )
@@ -70,6 +71,26 @@ def test_reads_foxe_manifest(tmp_path: Path) -> None:
         version="1.0.0",
         display_name="Quest Teleop Controls",
     )
+
+
+def test_normalizes_equivalent_foxe_archives_to_identical_bytes(tmp_path: Path) -> None:
+    first = make_extension(tmp_path / "first.foxe")
+    second = make_extension(tmp_path / "second.foxe")
+    with zipfile.ZipFile(second, "a") as archive:
+        archive.writestr(
+            zipfile.ZipInfo("dist/", date_time=(2026, 9, 3, 12, 34, 56)),
+            b"",
+        )
+    with zipfile.ZipFile(first, "a") as archive:
+        archive.writestr(
+            zipfile.ZipInfo("dist/", date_time=(2025, 1, 2, 3, 4, 6)),
+            b"",
+        )
+
+    normalize_extension_archive(first)
+    normalize_extension_archive(second)
+
+    assert first.read_bytes() == second.read_bytes()
 
 
 def test_publishes_extension_before_layout_and_verifies_both(tmp_path: Path) -> None:

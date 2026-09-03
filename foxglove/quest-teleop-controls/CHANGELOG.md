@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+- Make repeated CI publication byte-for-byte reproducible.
+
 ## 1.3.0
 
 - Reduce the panel to acknowledged control buttons only; connection and source

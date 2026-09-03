@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import sys
@@ -19,6 +20,7 @@ from typing import Any
 API_BASE = "https://api.foxglove.dev/v1"
 DEFAULT_LAYOUT_ID = "lay_0eaTLQSSPmExnWfB"
 DEFAULT_LAYOUT_NAME = "Quest Unified Teleop"
+_DETERMINISTIC_ZIP_TIMESTAMP = (2021, 2, 3, 0, 0, 0)
 
 
 class FoxgloveApiError(RuntimeError):
@@ -149,6 +151,37 @@ def read_extension_manifest(extension: Path) -> ExtensionManifest:
     )
 
 
+def normalize_extension_archive(extension: Path) -> None:
+    """Rewrite a .foxe archive deterministically before hashing and upload.
+
+    The Foxglove packager gives directory entries the build time even though
+    file entries are reproducible. Normalizing every entry prevents an
+    unchanged extension version from acquiring a different API checksum on a
+    later CI run.
+    """
+
+    if extension.suffix != ".foxe":
+        raise ValueError(f"extension must be a .foxe archive: {extension}")
+    try:
+        with zipfile.ZipFile(extension) as source:
+            entries = [
+                (info.filename, source.read(info), info.external_attr, info.create_system)
+                for info in source.infolist()
+            ]
+    except (FileNotFoundError, zipfile.BadZipFile) as error:
+        raise ValueError(f"invalid Foxglove extension archive: {extension}") from error
+
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as destination:
+        for filename, payload, external_attr, create_system in sorted(entries):
+            info = zipfile.ZipInfo(filename, date_time=_DETERMINISTIC_ZIP_TIMESTAMP)
+            info.compress_type = zipfile.ZIP_STORED
+            info.external_attr = external_attr
+            info.create_system = create_system
+            destination.writestr(info, payload)
+    extension.write_bytes(output.getvalue())
+
+
 def _matching_extension(
     extensions: list[dict[str, Any]], manifest: ExtensionManifest
 ) -> dict[str, Any] | None:
@@ -218,6 +251,7 @@ def publish_assets(
     layout_id: str = DEFAULT_LAYOUT_ID,
     layout_name: str = DEFAULT_LAYOUT_NAME,
 ) -> PublishResult:
+    normalize_extension_archive(extension)
     manifest = read_extension_manifest(extension)
     extension_sha256 = hashlib.sha256(extension.read_bytes()).hexdigest()
     layout_data = json.loads(layout.read_text(encoding="utf-8"))
