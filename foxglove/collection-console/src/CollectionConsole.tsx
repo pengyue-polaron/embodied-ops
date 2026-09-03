@@ -201,6 +201,9 @@ function CollectionConsole({ context }: { context: PanelExtensionContext }): Rea
     background: "transparent",
     fontFamily: "Inter, system-ui, sans-serif",
   };
+  const statusText = configuration.error ?? statusLabel(status, { stale });
+  const details =
+    configuration.error == undefined ? statusDetails(status, { stale }) : [];
 
   return (
     <main style={rootStyle}>
@@ -210,11 +213,24 @@ function CollectionConsole({ context }: { context: PanelExtensionContext }): Rea
           padding: "10px 12px",
           border: `1px solid ${palette.border}`,
           borderRadius: 4,
-          fontSize: 16,
-          fontWeight: 600,
         }}
       >
-        {configuration.error ?? statusLabel(status, { stale })}
+        <div style={{ fontSize: 16, fontWeight: 600 }}>{statusText}</div>
+        {details.map((detail) => (
+          <div
+            key={detail}
+            style={{
+              marginTop: 3,
+              color: palette.muted,
+              fontSize: 11,
+              fontWeight: 400,
+              lineHeight: 1.4,
+              overflowWrap: "anywhere",
+            }}
+          >
+            {detail}
+          </div>
+        ))}
       </div>
 
       <section
@@ -424,6 +440,9 @@ function statusLabel(status: WorkflowStatus, { stale }: { stale: boolean }): str
     }
     return "Idle";
   }
+  if (status.state === "stopping") {
+    return "Stopping";
+  }
   if (status.inputPhase === "ready") {
     return "Ready";
   }
@@ -434,6 +453,7 @@ function statusLabel(status: WorkflowStatus, { stale }: { stale: boolean }): str
     status.progress.find((item) => item.id === "collection")?.phase ??
     status.progress[status.progress.length - 1]?.phase;
   const labels: Record<string, string> = {
+    preparing: "Preparing",
     saving: "Saving",
     discarding: "Discarding",
     resetting: "Resetting",
@@ -441,6 +461,26 @@ function statusLabel(status: WorkflowStatus, { stale }: { stale: boolean }): str
     completed: "Completed",
   };
   return labels[progressPhase ?? ""] ?? "Running";
+}
+
+function statusDetails(
+  status: WorkflowStatus,
+  { stale }: { stale: boolean },
+): string[] {
+  if (stale || !status.available || status.workflow !== "collect") {
+    return [];
+  }
+  const collection = status.progress.find((item) => item.id === "collection");
+  const contextDetail =
+    status.inputDetail.length > 0 ? status.inputDetail : (collection?.detail ?? "");
+  const details = [contextDetail];
+  if (
+    status.active &&
+    (status.inputPhase === "recording" || collection?.phase === "recording")
+  ) {
+    details.push(status.progress.find((item) => item.id === "capture")?.detail ?? "");
+  }
+  return [...new Set(details.filter((detail) => detail.length > 0))];
 }
 
 function controlEnabled(

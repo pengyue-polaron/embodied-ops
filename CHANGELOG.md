@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Show concise Runtime-provided episode context and live capture progress in the
+  Foxglove Collection Console, including a distinct preparing phase.
+
 ## 0.10.0
 
 - Add the canonical ZMQ-to-Foxglove gateway, compact React controls, and

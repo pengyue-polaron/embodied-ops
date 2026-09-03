@@ -10,6 +10,8 @@ The status topic carries a sanitized schema-2 Operator Panel snapshot in a ROS
 validate the current workflow, phase, run id, input revision, and action before
 forwarding an input to the shared Operator Panel application. The
 `embodied_ops.foxglove` helpers implement that transport-independent validation.
+The compact status renders the Runtime-supplied phase and operator detail, plus
+live capture detail while the recording gate is active.
 
 Build with `npm ci && npm run build && npm run lint`. Consuming Runtime
 repositories package this pinned extension and inject their configuration with
