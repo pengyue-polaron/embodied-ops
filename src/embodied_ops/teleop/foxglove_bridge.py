@@ -239,13 +239,8 @@ def diagnostic_array(
         and source_age_sec <= _SOURCE_STALE_SEC
     )
     source_stale = not target_fresh and not status_fresh
-    feedback_stale = (
-        feedback is None or feedback_age_sec is None or feedback_age_sec > _BACKEND_STALE_SEC
-    )
     source = source_status or {}
     source_metadata = source.get("source_metadata", {})
-    diagnostics = {} if feedback is None else feedback.diagnostics
-    reason = str(diagnostics.get("mapping_reason", diagnostics.get("guard_reason", "")))
     source_name = str(source.get("source") or (target.source if target is not None else "input"))
     synthetic_source = source_name == "synthetic"
     if synthetic_source:
@@ -270,34 +265,19 @@ def diagnostic_array(
 
     if source_stale:
         level = DIAGNOSTIC_STALE
-        message = "Input source offline"
+        message = "Disconnected"
     elif not source_online:
         level = DIAGNOSTIC_ERROR
-        message = "Input source offline"
+        message = "Disconnected"
     elif not app_active:
-        level = DIAGNOSTIC_WARN
-        message = "Input application not active"
+        level = DIAGNOSTIC_ERROR
+        message = "Disconnected"
     elif gate_known and not gate_open:
         level = DIAGNOSTIC_WARN
-        message = "Paused — press B to stream"
-    elif not stream_online:
-        level = DIAGNOSTIC_WARN
-        message = "Controller offline"
-    elif not target_fresh:
-        level = DIAGNOSTIC_STALE
-        message = "Controller pose stale"
-    elif not tracking_valid:
-        level = DIAGNOSTIC_WARN
-        message = "Controller tracking unavailable"
-    elif feedback_stale:
-        level = DIAGNOSTIC_STALE
-        message = "Streaming — backend not responding"
-    elif feedback is not None and feedback.status == "episode_finished":
-        level = DIAGNOSTIC_WARN
-        message = "Streaming — episode finished"
-    elif reason and reason != "active":
-        level = DIAGNOSTIC_WARN
-        message = "Streaming — control stabilizing"
+        message = "Paused"
+    elif not gate_known or not stream_online or not target_fresh or not tracking_valid:
+        level = DIAGNOSTIC_ERROR
+        message = "Disconnected"
     else:
         level = DIAGNOSTIC_OK
         message = "Streaming"
@@ -308,15 +288,6 @@ def diagnostic_array(
         source_label = f"{source_name.title()} · Offline"
     else:
         source_label = f"{source_name.title()} · Online"
-
-    if not gate_known:
-        streaming_label = "UNKNOWN"
-    elif not gate_open:
-        streaming_label = "PAUSED · B released"
-    elif stream_online:
-        streaming_label = "ON · B pressed"
-    else:
-        streaming_label = "OFFLINE · B pressed"
 
     if target_fresh and target is not None and target.tracking_valid:
         x, y, z = target.position
@@ -330,7 +301,7 @@ def diagnostic_array(
             level,
             message,
             [
-                ("Streaming", streaming_label),
+                ("Controller state", message),
                 ("Controller pose (m)", position_label),
                 ("Input source", source_label),
             ],
@@ -383,15 +354,7 @@ def operator_state(
         if target_fresh and target is not None and target.tracking_valid
         else None
     )
-    streaming = values.get("Streaming", "UNKNOWN")
-    if streaming.startswith("ON"):
-        controller = "Streaming"
-    elif streaming.startswith("PAUSED"):
-        controller = "Paused · press B"
-    elif streaming.startswith("OFFLINE"):
-        controller = "Offline · move controller"
-    else:
-        controller = "Waiting"
+    controller = str(values.get("Controller state", "Disconnected"))
 
     feedback_fresh = bool(
         feedback is not None

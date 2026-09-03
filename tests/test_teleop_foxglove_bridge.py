@@ -197,11 +197,11 @@ def test_diagnostics_explain_tracking_loss_and_safe_hold() -> None:
     )
     status = message["status"][0]
     assert status["name"] == "Teleop/Controller"
-    assert status["level"] == 1
-    assert status["message"] == "Controller tracking unavailable"
+    assert status["level"] == 2
+    assert status["message"] == "Disconnected"
     assert status["hardware_id"] == "quest-teleop"
     assert status["values"] == [
-        {"key": "Streaming", "value": "ON · B pressed"},
+        {"key": "Controller state", "value": "Disconnected"},
         {"key": "Controller pose (m)", "value": "Unavailable"},
         {"key": "Input source", "value": "Quest · Online"},
     ]
@@ -379,7 +379,7 @@ def test_fresh_device_status_overrides_a_recent_pre_disconnect_target() -> None:
         feedback=None,
         feedback_age_sec=None,
     )["status"][0]
-    assert status["message"] == "Input source offline"
+    assert status["message"] == "Disconnected"
     assert status["values"][2]["value"] == "Quest · Offline"
 
 
@@ -401,8 +401,8 @@ def test_diagnostics_distinguish_paused_from_a_stale_controller_pose() -> None:
         feedback=None,
         feedback_age_sec=None,
     )["status"][0]
-    assert paused["message"] == "Paused — press B to stream"
-    assert paused["values"][0]["value"] == "PAUSED · B released"
+    assert paused["message"] == "Paused"
+    assert paused["values"][0] == {"key": "Controller state", "value": "Paused"}
 
     paused_without_pose_stream = diagnostic_array(
         timestamp_ns=123,
@@ -413,8 +413,11 @@ def test_diagnostics_distinguish_paused_from_a_stale_controller_pose() -> None:
         feedback=None,
         feedback_age_sec=None,
     )["status"][0]
-    assert paused_without_pose_stream["message"] == "Paused — press B to stream"
-    assert paused_without_pose_stream["values"][0]["value"] == "PAUSED · B released"
+    assert paused_without_pose_stream["message"] == "Paused"
+    assert paused_without_pose_stream["values"][0] == {
+        "key": "Controller state",
+        "value": "Paused",
+    }
 
     stale_source = diagnostic_array(
         timestamp_ns=123,
@@ -425,8 +428,8 @@ def test_diagnostics_distinguish_paused_from_a_stale_controller_pose() -> None:
         feedback=None,
         feedback_age_sec=None,
     )["status"][0]
-    assert stale_source["message"] == "Input source offline"
-    assert stale_source["values"][0]["value"] == "UNKNOWN"
+    assert stale_source["message"] == "Disconnected"
+    assert stale_source["values"][0]["value"] == "Disconnected"
 
 
 def test_diagnostics_do_not_invent_a_b_state_before_controller_input() -> None:
@@ -446,8 +449,8 @@ def test_diagnostics_do_not_invent_a_b_state_before_controller_input() -> None:
         feedback=None,
         feedback_age_sec=None,
     )["status"][0]
-    assert unknown["message"] == "Controller offline"
-    assert unknown["values"][0]["value"] == "UNKNOWN"
+    assert unknown["message"] == "Disconnected"
+    assert unknown["values"][0]["value"] == "Disconnected"
 
     last_pressed = diagnostic_array(
         timestamp_ns=123,
@@ -465,8 +468,8 @@ def test_diagnostics_do_not_invent_a_b_state_before_controller_input() -> None:
         feedback=None,
         feedback_age_sec=None,
     )["status"][0]
-    assert last_pressed["message"] == "Controller offline"
-    assert last_pressed["values"][0]["value"] == "OFFLINE · B pressed"
+    assert last_pressed["message"] == "Disconnected"
+    assert last_pressed["values"][0]["value"] == "Disconnected"
 
 
 def test_diagnostics_mark_missing_source_as_stale() -> None:
@@ -481,7 +484,7 @@ def test_diagnostics_mark_missing_source_as_stale() -> None:
     )
     status = message["status"][0]
     assert status["level"] == 3
-    assert status["message"] == "Input source offline"
+    assert status["message"] == "Disconnected"
 
 
 def test_deep_link_selects_organization_layout_and_local_bridge() -> None:
