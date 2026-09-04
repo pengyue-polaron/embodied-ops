@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Improve Operator Panel tabs on small screens with touch-sized, scroll-snap
+  navigation, active-state underlines, hidden scrollbars, and automatic active
+  tab centering while preserving the desktop segmented control.
+
 ## 0.10.3
 
 - Add a source-neutral retry-recording-stage command for transactional

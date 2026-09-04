@@ -41,3 +41,13 @@
   scrollbar-width: thin;
   overscroll-behavior: contain;
 }
+
+.operator-tabs-list {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior-inline: contain;
+}
+
+.operator-tabs-list::-webkit-scrollbar {
+  display: none;
+}

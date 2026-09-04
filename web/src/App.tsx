@@ -160,6 +160,7 @@ export function App() {
   const [activeTab, setActiveTab] = useState("")
   const [prefill, setPrefill] = useState<Record<string, Json>>({})
   const [notice, setNotice] = useState("")
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({})
 
   const showNotice = useCallback((message: string) => {
     setNotice(message)
@@ -209,6 +210,10 @@ export function App() {
   useEffect(() => {
     window.localStorage.setItem("operator-panel.camera-preview-collapsed", cameraCollapsed ? "1" : "0")
   }, [cameraCollapsed])
+
+  useEffect(() => {
+    tabRefs.current[activeTab]?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" })
+  }, [activeTab])
 
   const startWorkflow = useCallback(
     async (workflow: string, values: Json) => {
@@ -295,14 +300,34 @@ export function App() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0 animate-reveal">
-          <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-lg border bg-card p-1">
+          <TabsList
+            aria-label="Operator sections"
+            className="operator-tabs-list flex h-12 w-full snap-x snap-mandatory items-stretch justify-start overflow-x-auto rounded-none border-x-0 border-b bg-transparent p-0 sm:inline-flex sm:h-10 sm:w-fit sm:snap-none sm:items-center sm:rounded-lg sm:border sm:bg-card sm:p-1"
+          >
             {forms.map(({ form }) => (
-              <TabsTrigger key={form.id} value={form.id} className="h-8 px-3 text-xs">
-                {form.label}
+              <TabsTrigger
+                key={form.id}
+                value={form.id}
+                ref={(element) => {
+                  tabRefs.current[form.id] = element
+                }}
+                title={form.label}
+                className="group relative h-12 min-w-[7.25rem] max-w-[15rem] shrink-0 snap-start justify-center rounded-none border-b-2 border-transparent px-3 text-xs font-medium text-muted-foreground transition-colors data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground sm:h-8 sm:min-w-0 sm:max-w-none sm:rounded-sm sm:border-0 sm:data-[state=active]:bg-background sm:data-[state=active]:shadow-sm"
+              >
+                <span className="truncate">{form.label}</span>
               </TabsTrigger>
             ))}
             {catalog.configuration_types.length > 0 && (
-              <TabsTrigger value="configuration" className="h-8 px-3 text-xs">Configurations</TabsTrigger>
+              <TabsTrigger
+                value="configuration"
+                ref={(element) => {
+                  tabRefs.current.configuration = element
+                }}
+                title="Configurations"
+                className="group relative h-12 min-w-[7.25rem] shrink-0 snap-start justify-center rounded-none border-b-2 border-transparent px-3 text-xs font-medium text-muted-foreground transition-colors data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground sm:h-8 sm:min-w-0 sm:rounded-sm sm:border-0 sm:data-[state=active]:bg-background sm:data-[state=active]:shadow-sm"
+              >
+                <span className="truncate">Configurations</span>
+              </TabsTrigger>
             )}
           </TabsList>
 
