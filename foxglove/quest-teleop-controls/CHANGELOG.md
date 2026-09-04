@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.2
+
+- Remove Foxglove hold/resume controls; the Quest B button is the single owner
+  of pause/resume and downstream recorders exclude closed-clutch intervals.
+
 ## 1.3.1
 
 - Make repeated CI publication byte-for-byte reproducible.

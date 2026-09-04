@@ -69,10 +69,6 @@ button {
   gap: 6px;
 }
 
-.teleop-group:first-child .teleop-buttons {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .teleop-button {
   min-height: 34px;
   border: 1px solid var(--panel-border);
@@ -158,10 +154,6 @@ button {
   }
 
   .teleop-buttons {
-    grid-template-columns: 1fr;
-  }
-
-  .teleop-group:first-child .teleop-buttons {
     grid-template-columns: 1fr;
   }
 }

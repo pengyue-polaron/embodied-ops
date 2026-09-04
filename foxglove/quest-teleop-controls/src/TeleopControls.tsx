@@ -31,25 +31,6 @@ type ControlGroup = {
 
 const CONTROL_GROUPS: ControlGroup[] = [
   {
-    label: "Robot",
-    controls: [
-      {
-        id: "hold",
-        label: "Hold",
-        service: "/teleop/hold",
-        title: "Stop Cartesian motion and release the clutch home",
-        tone: "danger",
-      },
-      {
-        id: "resume",
-        label: "Resume",
-        service: "/teleop/resume",
-        title: "Resume and re-clutch from the current controller and EEF poses",
-        tone: "primary",
-      },
-    ],
-  },
-  {
     label: "Episode",
     controls: [
       {
@@ -188,7 +169,7 @@ function TeleopControls({ context }: { context: PanelExtensionContext }): ReactE
     if (!connected || operatorState == undefined) {
       return new Set<string>();
     }
-    const controls = new Set(["hold", "resume", "previous", "reset", "next"]);
+    const controls = new Set(["previous", "reset", "next"]);
     if (operatorState.recording) {
       controls.add("save");
       controls.add("discard");

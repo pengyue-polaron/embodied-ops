@@ -3,9 +3,9 @@
 A compact React control panel for canonical teleoperation services exposed by
 `embodied-teleop-foxglove`.
 
-The panel deliberately contains only three control groups:
+The panel deliberately contains only two control groups. The Quest B button
+owns pause/resume so clutch state cannot diverge between the controller and UI:
 
-- Safety: hold and resume/re-clutch.
 - Episode: previous, reset, and next.
 - Recording: start, stop and save, and permanently discard the active take.
 
