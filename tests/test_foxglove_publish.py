@@ -137,7 +137,7 @@ def test_shared_extension_can_publish_without_a_backend_layout(tmp_path: Path) -
     assert result.layout_id is None
 
 
-def test_react_panel_exposes_every_bridge_service() -> None:
+def test_react_panel_leaves_clutch_control_to_the_input_device() -> None:
     panel = (
         Path(__file__).parents[1]
         / "foxglove"
@@ -147,4 +147,6 @@ def test_react_panel_exposes_every_bridge_service() -> None:
     ).read_text(encoding="utf-8")
     panel_services = set(re.findall(r'service: "([^"]+)"', panel))
 
-    assert panel_services == set(SERVICE_COMMANDS)
+    clutch_services = {"/teleop/hold", "/teleop/resume"}
+    assert panel_services == set(SERVICE_COMMANDS) - clutch_services
+    assert panel_services.isdisjoint(clutch_services)
