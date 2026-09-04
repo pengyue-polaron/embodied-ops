@@ -409,9 +409,7 @@ def operator_state(
         "recording_phase": recording_phase if isinstance(recording_phase, str) else None,
         "active_agent": active_agent if isinstance(active_agent, str) else None,
         "replay_index": replay_index if isinstance(replay_index, int) else None,
-        "replay_frame_count": (
-            replay_frame_count if isinstance(replay_frame_count, int) else None
-        ),
+        "replay_frame_count": (replay_frame_count if isinstance(replay_frame_count, int) else None),
     }
 
 
