@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.10.2
+
+- Add typed sequential dual-arm phase and replay progress to the Foxglove
+  operator state, with phase-aware recording controls.
+
 ## 0.10.1
 
 - Show concise Runtime-provided episode context and live capture progress in the

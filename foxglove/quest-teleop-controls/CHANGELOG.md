@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.3
+
+- Show `Record Arm 1` and `Continue to Arm 2` for sequential single-controller
+  dual-arm acquisition while keeping the compact acknowledged-button surface.
+- Allow Save to wait for a backend's transactional simulator reset and expose
+  the active arm plus replay progress through the typed operator-state topic.
+
 ## 1.3.2
 
 - Remove Foxglove hold/resume controls; the Quest B button is the single owner

@@ -60,6 +60,9 @@ COMMAND_TIMEOUT_MS = {
     TeleopCommandName.RESET_EPISODE.value: 30_000,
     TeleopCommandName.PREVIOUS_EPISODE.value: 30_000,
     TeleopCommandName.NEXT_EPISODE.value: 30_000,
+    # Some backends use Save as a transactional phase boundary and must reset
+    # a simulator plus its isolated camera renderer before acknowledging it.
+    TeleopCommandName.STOP_RECORDING.value: 30_000,
 }
 
 DEFAULT_FOXGLOVE_LAYOUT_ID = ""
@@ -167,6 +170,10 @@ OPERATOR_STATE_SCHEMA = {
         "gate_open": {"type": "boolean"},
         "recording": {"type": "boolean"},
         "episode_id": {"type": ["string", "null"]},
+        "recording_phase": {"type": ["string", "null"]},
+        "active_agent": {"type": ["string", "null"]},
+        "replay_index": {"type": ["integer", "null"]},
+        "replay_frame_count": {"type": ["integer", "null"]},
     },
     "required": [
         "status",
@@ -179,6 +186,10 @@ OPERATOR_STATE_SCHEMA = {
         "gate_open",
         "recording",
         "episode_id",
+        "recording_phase",
+        "active_agent",
+        "replay_index",
+        "replay_frame_count",
     ],
 }
 
@@ -378,6 +389,11 @@ def operator_state(
         view = "Offline"
 
     source_label = str(values.get("Input source", "Input · Offline"))
+    feedback_diagnostics = feedback.diagnostics if feedback_fresh and feedback else {}
+    recording_phase = feedback_diagnostics.get("recording_phase")
+    active_agent = feedback_diagnostics.get("active_agent")
+    replay_index = feedback_diagnostics.get("arm1_replay_index")
+    replay_frame_count = feedback_diagnostics.get("arm1_timeline_frames")
     return {
         "status": str(diagnostics["message"]),
         "severity": severity,
@@ -390,6 +406,12 @@ def operator_state(
         "gate_open": bool(target_fresh and target is not None and target.gate_open),
         "recording": bool(feedback_fresh and feedback is not None and feedback.recording),
         "episode_id": feedback.episode_id if feedback_fresh and feedback is not None else None,
+        "recording_phase": recording_phase if isinstance(recording_phase, str) else None,
+        "active_agent": active_agent if isinstance(active_agent, str) else None,
+        "replay_index": replay_index if isinstance(replay_index, int) else None,
+        "replay_frame_count": (
+            replay_frame_count if isinstance(replay_frame_count, int) else None
+        ),
     }
 
 

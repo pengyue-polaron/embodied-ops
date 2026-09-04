@@ -263,7 +263,51 @@ def test_operator_state_summarizes_backend_and_view_latency() -> None:
         "gate_open": True,
         "recording": True,
         "episode_id": "episode",
+        "recording_phase": None,
+        "active_agent": None,
+        "replay_index": None,
+        "replay_frame_count": None,
     }
+
+
+def test_operator_state_exposes_sequential_dual_arm_phase() -> None:
+    feedback = TeleopFeedback(
+        backend="robotteambench_maniskill_sequential_dual_arm",
+        episode_id="sorting-1",
+        frame_index=12,
+        status="running",
+        target_seq=19,
+        target_age_ms=4.0,
+        gate_open=True,
+        recording=True,
+        eef_position=[0.0, 0.0, 0.0],
+        gripper=-1.0,
+        action=[0.0] * 7,
+        diagnostics={
+            "recording_phase": "replay_arm_1_record_arm_2",
+            "active_agent": "panda-1",
+            "arm1_replay_index": 8,
+            "arm1_timeline_frames": 31,
+        },
+    )
+    state = operator_state(
+        timestamp_ns=123,
+        source_status={
+            "source": "synthetic",
+            "stream_online": True,
+            "tracking_valid": True,
+            "gate_open": True,
+        },
+        source_age_sec=0.1,
+        target=None,
+        target_age_sec=None,
+        feedback=feedback,
+        feedback_age_sec=0.01,
+    )
+    assert state["recording_phase"] == "replay_arm_1_record_arm_2"
+    assert state["active_agent"] == "panda-1"
+    assert state["replay_index"] == 8
+    assert state["replay_frame_count"] == 31
 
 
 def test_fresh_target_proves_quest_online_when_status_heartbeat_is_dropped() -> None:

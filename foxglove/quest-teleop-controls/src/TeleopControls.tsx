@@ -12,6 +12,8 @@ type CommandResponse = {
 
 type OperatorState = {
   recording: boolean;
+  recording_phase?: string | null;
+  active_agent?: string | null;
 };
 
 const OPERATOR_STATE_TOPIC = "/teleop/operator_state";
@@ -93,6 +95,16 @@ function responseMessage(response: unknown, fallback: string): string {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function controlLabel(control: Control, state: OperatorState | undefined): string {
+  if (control.id === "record" && state?.recording_phase != undefined) {
+    return "Record Arm 1";
+  }
+  if (control.id === "save" && state?.recording_phase === "record_arm_1") {
+    return "Continue to Arm 2";
+  }
+  return control.label;
 }
 
 function asOperatorState(value: unknown): OperatorState | undefined {
@@ -230,7 +242,7 @@ function TeleopControls({ context }: { context: PanelExtensionContext }): ReactE
                   title={control.title}
                   type="button"
                 >
-                  {pending === control.id ? "Working…" : control.label}
+                  {pending === control.id ? "Working…" : controlLabel(control, operatorState)}
                 </button>
               ))}
             </div>
