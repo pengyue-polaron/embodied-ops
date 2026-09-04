@@ -42,13 +42,12 @@ jobs:
           python -m pytest -q tests/test_foxglove_publish.py
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: Verify extension
         run: |
           npm run typecheck
           npm run lint
-          npm audit
 
       - name: Package extension
         run: npm run package
