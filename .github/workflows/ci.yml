@@ -36,7 +36,15 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci --prefer-offline --no-audit --no-fund
         working-directory: web
-      - run: npm audit --audit-level=high
+      - name: Audit production and development dependencies
+        run: |
+          for attempt in 1 2 3; do
+            npm audit --audit-level=high && exit 0
+            if [ "$attempt" -lt 3 ]; then
+              sleep "$((attempt * 5))"
+            fi
+          done
+          exit 1
         working-directory: web
       - run: npm run build
         working-directory: web
@@ -57,7 +65,15 @@ jobs:
         working-directory: foxglove/quest-teleop-controls
       - run: npm run lint
         working-directory: foxglove/quest-teleop-controls
-      - run: npm audit --audit-level=high
+      - name: Audit production and development dependencies
+        run: |
+          for attempt in 1 2 3; do
+            npm audit --audit-level=high && exit 0
+            if [ "$attempt" -lt 3 ]; then
+              sleep "$((attempt * 5))"
+            fi
+          done
+          exit 1
         working-directory: foxglove/quest-teleop-controls
       - run: npm run package
         working-directory: foxglove/quest-teleop-controls
