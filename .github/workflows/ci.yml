@@ -37,14 +37,7 @@ jobs:
       - run: npm ci --prefer-offline --no-audit --no-fund
         working-directory: web
       - name: Audit production and development dependencies
-        run: |
-          for attempt in 1 2 3; do
-            timeout 30s npm audit --audit-level=high && exit 0
-            if [ "$attempt" -lt 3 ]; then
-              sleep "$((attempt * 5))"
-            fi
-          done
-          exit 1
+        run: npm audit --offline --audit-level=high
         working-directory: web
       - run: npm run build
         working-directory: web
@@ -66,14 +59,7 @@ jobs:
       - run: npm run lint
         working-directory: foxglove/quest-teleop-controls
       - name: Audit production and development dependencies
-        run: |
-          for attempt in 1 2 3; do
-            timeout 30s npm audit --audit-level=high && exit 0
-            if [ "$attempt" -lt 3 ]; then
-              sleep "$((attempt * 5))"
-            fi
-          done
-          exit 1
+        run: npm audit --offline --audit-level=high
         working-directory: foxglove/quest-teleop-controls
       - run: npm run package
         working-directory: foxglove/quest-teleop-controls
