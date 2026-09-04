@@ -53,6 +53,7 @@ SERVICE_COMMANDS = {
     "/teleop/episode/next": TeleopCommandName.NEXT_EPISODE.value,
     "/teleop/recording/start": TeleopCommandName.START_RECORDING.value,
     "/teleop/recording/stop": TeleopCommandName.STOP_RECORDING.value,
+    "/teleop/recording/retry-stage": TeleopCommandName.RETRY_RECORDING_STAGE.value,
     "/teleop/recording/discard": TeleopCommandName.DISCARD_RECORDING.value,
 }
 
@@ -63,6 +64,7 @@ COMMAND_TIMEOUT_MS = {
     # Some backends use Save as a transactional phase boundary and must reset
     # a simulator plus its isolated camera renderer before acknowledging it.
     TeleopCommandName.STOP_RECORDING.value: 30_000,
+    TeleopCommandName.RETRY_RECORDING_STAGE.value: 30_000,
 }
 
 DEFAULT_FOXGLOVE_LAYOUT_ID = ""

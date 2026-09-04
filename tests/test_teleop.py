@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 
 import pytest
+from embodied_ops import __version__
 
 from embodied_ops.teleop import (
     EPISODE_MANIFEST_SCHEMA,
@@ -22,6 +23,10 @@ from embodied_ops.teleop import (
     build_axis_map,
     matrix_to_quat_xyzw,
 )
+
+
+def test_package_version_matches_retry_stage_release() -> None:
+    assert __version__ == "0.10.3"
 
 
 def target(seq: int = 1) -> TeleopTarget:
@@ -99,6 +104,11 @@ def test_command_vocabulary_and_age_are_canonical() -> None:
         issued_unix_ns=1_000_000_000,
     )
     assert command.age_ms(now_unix_ns=1_250_000_000) == 250.0
+    retry = TeleopCommand(
+        command=TeleopCommandName.RETRY_RECORDING_STAGE.value,
+        request_id="request-2",
+    )
+    assert retry.command == "retry_recording_stage"
     with pytest.raises(ValueError, match="unsupported teleop command"):
         TeleopCommand(command="backend_private_command", request_id="bad")
 

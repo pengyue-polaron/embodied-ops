@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.10.3
+
+- Add a source-neutral retry-recording-stage command for transactional
+  multi-stage acquisition backends.
+- Show a phase-aware **Retry Arm 2** control only while the sequential second
+  pass is active.
+
 ## 0.10.2
 
 - Add typed sequential dual-arm phase and replay progress to the Foxglove

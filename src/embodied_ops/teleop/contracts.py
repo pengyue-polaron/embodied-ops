@@ -26,6 +26,7 @@ class TeleopCommandName(str, Enum):
     NEXT_EPISODE = "next_episode"
     START_RECORDING = "start_recording"
     STOP_RECORDING = "stop_recording"
+    RETRY_RECORDING_STAGE = "retry_recording_stage"
     DISCARD_RECORDING = "discard_recording"
 
 

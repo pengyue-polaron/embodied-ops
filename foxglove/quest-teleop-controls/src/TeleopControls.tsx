@@ -72,6 +72,12 @@ const CONTROL_GROUPS: ControlGroup[] = [
         title: "Finalize and save the current recording",
       },
       {
+        id: "retry-stage",
+        label: "Retry Arm 2",
+        service: "/teleop/recording/retry-stage",
+        title: "Keep Arm 1 and restart Arm 2 from the synchronized initial state",
+      },
+      {
         id: "discard",
         label: "Discard",
         service: "/teleop/recording/discard",
@@ -105,6 +111,21 @@ function controlLabel(control: Control, state: OperatorState | undefined): strin
     return "Continue to Arm 2";
   }
   return control.label;
+}
+
+function isVisible(control: Control, state: OperatorState | undefined): boolean {
+  if (control.id === "record") {
+    return state?.recording !== true;
+  }
+  if (control.id === "save" || control.id === "discard") {
+    return state?.recording === true;
+  }
+  if (control.id === "retry-stage") {
+    return (
+      state?.recording === true && state.recording_phase === "replay_arm_1_record_arm_2"
+    );
+  }
+  return true;
 }
 
 function asOperatorState(value: unknown): OperatorState | undefined {
@@ -185,6 +206,9 @@ function TeleopControls({ context }: { context: PanelExtensionContext }): ReactE
     if (operatorState.recording) {
       controls.add("save");
       controls.add("discard");
+      if (operatorState.recording_phase === "replay_arm_1_record_arm_2") {
+        controls.add("retry-stage");
+      }
     } else {
       controls.add("record");
     }
@@ -231,20 +255,22 @@ function TeleopControls({ context }: { context: PanelExtensionContext }): ReactE
           <section className="teleop-group" key={group.label}>
             <h2 className="teleop-group-label">{group.label}</h2>
             <div className="teleop-buttons">
-              {group.controls.map((control) => (
-                <button
-                  className={`teleop-button${control.tone ? ` teleop-button--${control.tone}` : ""}`}
-                  disabled={pending != undefined || !enabledControls.has(control.id)}
-                  key={control.id}
-                  onClick={() => {
-                    void run(control);
-                  }}
-                  title={control.title}
-                  type="button"
-                >
-                  {pending === control.id ? "Working…" : controlLabel(control, operatorState)}
-                </button>
-              ))}
+              {group.controls
+                .filter((control) => isVisible(control, operatorState))
+                .map((control) => (
+                  <button
+                    className={`teleop-button${control.tone ? ` teleop-button--${control.tone}` : ""}`}
+                    disabled={pending != undefined || !enabledControls.has(control.id)}
+                    key={control.id}
+                    onClick={() => {
+                      void run(control);
+                    }}
+                    title={control.title}
+                    type="button"
+                  >
+                    {pending === control.id ? "Working…" : controlLabel(control, operatorState)}
+                  </button>
+                ))}
             </div>
           </section>
         ))}

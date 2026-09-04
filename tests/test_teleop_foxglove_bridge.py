@@ -49,6 +49,9 @@ def test_command_services_cover_navigation_and_safety() -> None:
     assert response["accepted"] is True
     assert response["applied"] is True
     assert response["backend"] == "unit"
+    retry = router.execute("retry_recording_stage")
+    assert retry["accepted"] is True
+    assert retry["applied"] is True
 
 
 def test_feedback_is_flattened_for_foxglove_plots() -> None:

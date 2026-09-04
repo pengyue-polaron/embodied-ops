@@ -150,3 +150,5 @@ def test_react_panel_leaves_clutch_control_to_the_input_device() -> None:
     clutch_services = {"/teleop/hold", "/teleop/resume"}
     assert panel_services == set(SERVICE_COMMANDS) - clutch_services
     assert panel_services.isdisjoint(clutch_services)
+    assert 'label: "Retry Arm 2"' in panel
+    assert 'recording_phase === "replay_arm_1_record_arm_2"' in panel

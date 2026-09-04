@@ -7,7 +7,9 @@ The panel deliberately contains only two control groups. The Quest B button
 owns pause/resume so clutch state cannot diverge between the controller and UI:
 
 - Episode: previous, reset, and next.
-- Recording: start, stop and save, and permanently discard the active take.
+- Recording: start, advance/save, retry a supported active stage, and
+  permanently discard the active take. **Retry Arm 2** appears only during the
+  sequential second pass.
 
 Every action waits for the backend acknowledgement before another action can be sent. The panel does not bypass the ZMQ command plane or talk directly to ManiSkill/MuJoCo.
 

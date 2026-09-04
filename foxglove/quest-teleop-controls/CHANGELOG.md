@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.4
+
+- Show **Retry Arm 2** only during the sequential second pass. The command
+  keeps the completed Arm 1 trajectory and restarts synchronized replay plus
+  Arm 2 capture from the exact initial snapshot.
+
 ## 1.3.3
 
 - Show `Record Arm 1` and `Continue to Arm 2` for sequential single-controller
