@@ -535,11 +535,11 @@ def pose_message(
 
 
 def foxglove_deep_link(*, websocket_url: str, layout_id: str = "") -> str:
-    """Build the preferred Foxglove web-to-desktop link."""
+    """Build a Foxglove Web link for the live source and backend layout."""
     parameters = {
         "ds": "foxglove-websocket",
         "ds.url": websocket_url,
-        "openIn": "desktop",
+        "openIn": "web",
     }
     if layout_id:
         parameters["layoutId"] = layout_id
@@ -547,7 +547,7 @@ def foxglove_deep_link(*, websocket_url: str, layout_id: str = "") -> str:
 
 
 def open_foxglove(deep_link: str) -> str:
-    """Open the exact data source and layout, even when Desktop is running."""
+    """Open the exact data source and layout in the default web browser."""
 
     subprocess.run(["open", deep_link], check=False)
     return "requested data source and layout"

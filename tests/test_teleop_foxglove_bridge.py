@@ -449,7 +449,7 @@ def test_deep_link_omits_layout_until_a_backend_selects_one() -> None:
     assert "ds=foxglove-websocket" in link
     assert "ds.url=ws%3A%2F%2F127.0.0.1%3A8765" in link
     assert "layoutId=" not in link
-    assert "openIn=desktop" in link
+    assert "openIn=web" in link
 
 
 def test_deep_link_selects_the_backend_layout() -> None:

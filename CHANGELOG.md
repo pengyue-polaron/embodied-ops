@@ -2,8 +2,12 @@
 
 ## Unreleased
 
+## 0.10.1
+
 - Show concise Runtime-provided episode context and live capture progress in the
   Foxglove Collection Console, including a distinct preparing phase.
+- Open generated Foxglove live-session links directly in the Web app instead of
+  prompting for the desktop client.
 
 ## 0.10.0
 
