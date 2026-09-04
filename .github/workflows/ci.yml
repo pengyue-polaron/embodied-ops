@@ -39,7 +39,7 @@ jobs:
       - name: Audit production and development dependencies
         run: |
           for attempt in 1 2 3; do
-            npm audit --audit-level=high && exit 0
+            timeout 30s npm audit --audit-level=high && exit 0
             if [ "$attempt" -lt 3 ]; then
               sleep "$((attempt * 5))"
             fi
@@ -68,7 +68,7 @@ jobs:
       - name: Audit production and development dependencies
         run: |
           for attempt in 1 2 3; do
-            npm audit --audit-level=high && exit 0
+            timeout 30s npm audit --audit-level=high && exit 0
             if [ "$attempt" -lt 3 ]; then
               sleep "$((attempt * 5))"
             fi
