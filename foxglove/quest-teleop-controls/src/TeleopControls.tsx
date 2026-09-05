@@ -1,5 +1,12 @@
 import { PanelExtensionContext } from "@foxglove/extension";
-import { ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ReactElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createRoot } from "react-dom/client";
 
 import "./styles.css";
@@ -14,6 +21,7 @@ type OperatorState = {
   recording: boolean;
   recording_phase?: string | null;
   active_agent?: string | null;
+  alignment?: { state: string; revision: string; message: string } | null;
 };
 
 const OPERATOR_STATE_TOPIC = "/teleop/operator_state";
@@ -75,7 +83,8 @@ const CONTROL_GROUPS: ControlGroup[] = [
         id: "retry-stage",
         label: "Retry Arm 2",
         service: "/teleop/recording/retry-stage",
-        title: "Keep Arm 1 and restart Arm 2 from the synchronized initial state",
+        title:
+          "Keep Arm 1 and restart Arm 2 from the synchronized initial state",
       },
       {
         id: "discard",
@@ -103,7 +112,10 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function controlLabel(control: Control, state: OperatorState | undefined): string {
+function controlLabel(
+  control: Control,
+  state: OperatorState | undefined,
+): string {
   if (control.id === "record" && state?.recording_phase != undefined) {
     return "Record Arm 1";
   }
@@ -113,7 +125,10 @@ function controlLabel(control: Control, state: OperatorState | undefined): strin
   return control.label;
 }
 
-function isVisible(control: Control, state: OperatorState | undefined): boolean {
+function isVisible(
+  control: Control,
+  state: OperatorState | undefined,
+): boolean {
   if (control.id === "record") {
     return state?.recording !== true;
   }
@@ -122,7 +137,8 @@ function isVisible(control: Control, state: OperatorState | undefined): boolean 
   }
   if (control.id === "retry-stage") {
     return (
-      state?.recording === true && state.recording_phase === "replay_arm_1_record_arm_2"
+      state?.recording === true &&
+      state.recording_phase === "replay_arm_1_record_arm_2"
     );
   }
   return true;
@@ -139,9 +155,16 @@ function asOperatorState(value: unknown): OperatorState | undefined {
   return state as OperatorState;
 }
 
-function TeleopControls({ context }: { context: PanelExtensionContext }): ReactElement {
+function TeleopControls({
+  context,
+}: {
+  context: PanelExtensionContext;
+}): ReactElement {
   const [pending, setPending] = useState<string>();
-  const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string }>();
+  const [notice, setNotice] = useState<{
+    tone: "ok" | "error";
+    text: string;
+  }>();
   const [operatorState, setOperatorState] = useState<OperatorState>();
   const [lastStateAt, setLastStateAt] = useState(0);
   const [now, setNow] = useState(Date.now());
@@ -198,6 +221,19 @@ function TeleopControls({ context }: { context: PanelExtensionContext }): ReactE
   }, []);
 
   const connected = lastStateAt > 0 && now - lastStateAt <= 1500;
+  const alignment = operatorState?.alignment;
+  const alignmentAction =
+    alignment?.state === "right_done"
+      ? "forward"
+      : alignment?.state.startsWith("collecting_") === true
+        ? "finish"
+        : "start";
+  const alignmentLabel =
+    alignmentAction === "forward"
+      ? "Collect forward"
+      : alignmentAction === "finish"
+        ? "Finish"
+        : "Align";
   const enabledControls = useMemo(() => {
     if (!connected || operatorState == undefined) {
       return new Set<string>();
@@ -248,9 +284,61 @@ function TeleopControls({ context }: { context: PanelExtensionContext }): ReactE
     [context, showNotice],
   );
 
+  const align = async () => {
+    if (
+      requestInFlight.current ||
+      alignment == undefined ||
+      context.callService == undefined
+    ) {
+      return;
+    }
+    requestInFlight.current = true;
+    setPending("align");
+    try {
+      const response = await context.callService("/teleop/source/align", {
+        action: alignmentAction,
+        revision: alignment.revision,
+        request_id: crypto.randomUUID(),
+      });
+      responseMessage(response, "Alignment updated");
+      const next = (response as { alignment?: OperatorState["alignment"] })
+        .alignment;
+      if (next != undefined) {
+        setOperatorState((previous) =>
+          previous ? { ...previous, alignment: next } : previous,
+        );
+      }
+    } catch (error) {
+      showNotice("error", errorMessage(error));
+    } finally {
+      requestInFlight.current = false;
+      setPending(undefined);
+    }
+  };
+
   return (
     <div className="teleop-panel" aria-busy={pending != undefined}>
       <div className="teleop-groups">
+        {alignment != undefined && (
+          <section className="teleop-group">
+            <h2 className="teleop-group-label">Directions</h2>
+            <div className="teleop-buttons teleop-alignment">
+              <button
+                className="teleop-button"
+                type="button"
+                disabled={!connected || pending != undefined}
+                onClick={() => {
+                  void align();
+                }}
+              >
+                {pending === "align" ? "Working…" : alignmentLabel}
+              </button>
+              {alignment.state !== "ready" && (
+                <span role="status">{alignment.message}</span>
+              )}
+            </div>
+          </section>
+        )}
         {CONTROL_GROUPS.map((group) => (
           <section className="teleop-group" key={group.label}>
             <h2 className="teleop-group-label">{group.label}</h2>
@@ -260,7 +348,9 @@ function TeleopControls({ context }: { context: PanelExtensionContext }): ReactE
                 .map((control) => (
                   <button
                     className={`teleop-button${control.tone ? ` teleop-button--${control.tone}` : ""}`}
-                    disabled={pending != undefined || !enabledControls.has(control.id)}
+                    disabled={
+                      pending != undefined || !enabledControls.has(control.id)
+                    }
                     key={control.id}
                     onClick={() => {
                       void run(control);
@@ -268,7 +358,9 @@ function TeleopControls({ context }: { context: PanelExtensionContext }): ReactE
                     title={control.title}
                     type="button"
                   >
-                    {pending === control.id ? "Working…" : controlLabel(control, operatorState)}
+                    {pending === control.id
+                      ? "Working…"
+                      : controlLabel(control, operatorState)}
                   </button>
                 ))}
             </div>

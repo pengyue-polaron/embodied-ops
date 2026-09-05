@@ -88,6 +88,13 @@ button {
   white-space: nowrap;
 }
 
+.teleop-alignment {
+  grid-template-columns: minmax(100px, 1fr) 2fr;
+  align-items: center;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .teleop-button:hover:not(:disabled) {
   background: var(--button-hover);
 }

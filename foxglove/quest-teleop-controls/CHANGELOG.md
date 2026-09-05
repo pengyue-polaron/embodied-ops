@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.0
+
+- Add compact source-owned direction alignment with acknowledged, revision-checked steps.
+- Keep tracking/calibration status in Diagnostics; no duplicate status cards.
+
 ## 1.3.4
 
 - Show **Retry Arm 2** only during the sequential second pass. The command

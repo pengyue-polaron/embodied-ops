@@ -4,7 +4,7 @@
   "description": "Compact operator controls for the canonical Quest teleoperation services.",
   "publisher": "pengyue-robotics",
   "homepage": "https://github.com/pengyue-polaron/embodied-ops",
-  "version": "1.3.4",
+  "version": "1.4.0",
   "license": "MIT",
   "main": "./dist/extension.js",
   "keywords": [

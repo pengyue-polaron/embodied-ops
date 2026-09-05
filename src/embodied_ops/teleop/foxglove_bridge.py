@@ -42,6 +42,7 @@ from foxglove.messages import (
     Vector3,
 )
 from foxglove.websocket import Capability, ServiceRequest
+from .source_control import DEFAULT_SOURCE_CONTROL_ENDPOINT, request_alignment
 
 import foxglove
 from foxglove import MessageSchema, Schema, Service, ServiceSchema
@@ -177,6 +178,7 @@ OPERATOR_STATE_SCHEMA = {
         "active_agent": {"type": ["string", "null"]},
         "replay_index": {"type": ["integer", "null"]},
         "replay_frame_count": {"type": ["integer", "null"]},
+        "alignment": {"type": ["object", "null"], "additionalProperties": True},
     },
     "required": [
         "status",
@@ -286,6 +288,11 @@ def diagnostic_array(
     elif not app_active:
         level = DIAGNOSTIC_ERROR
         message = "Disconnected"
+    elif (target.source_metadata if target_fresh and target is not None else source_metadata).get(
+        "calibration_valid"
+    ) is False:
+        level = DIAGNOSTIC_WARN
+        message = "Calibration needs confirmation"
     elif gate_known and not gate_open:
         level = DIAGNOSTIC_WARN
         message = "Paused"
@@ -399,6 +406,13 @@ def operator_state(
     replay_frame_count = feedback_diagnostics.get("arm1_timeline_frames")
     return {
         "status": str(diagnostics["message"]),
+        "alignment": (
+            target.source_metadata.get("alignment")
+            if target_fresh and target is not None
+            else (source_status or {}).get("source_metadata", {}).get("alignment")
+            if source_age_sec is not None and source_age_sec <= _SOURCE_STALE_SEC
+            else None
+        ),
         "severity": severity,
         "source": source_label,
         "quest": source_label,
@@ -500,6 +514,36 @@ def build_services(router: CommandRouter) -> list[Service]:
     ]
 
 
+def alignment_service(endpoint: str) -> Service:
+    schema = ServiceSchema(
+        "embodied.teleop.SourceAlignment",
+        request=_json_message_schema(
+            "embodied.teleop.AlignmentRequest",
+            {
+                "type": "object",
+                "properties": {
+                    "request_id": {"type": "string"},
+                    "revision": {"type": "string"},
+                    "action": {"type": "string", "enum": ["start", "forward", "finish"]},
+                },
+                "required": ["request_id", "revision", "action"],
+            },
+        ),
+        response=_json_message_schema(
+            "embodied.teleop.AlignmentResponse",
+            {
+                "type": "object",
+                "additionalProperties": True,
+            },
+        ),
+    )
+
+    def handle(request: ServiceRequest) -> bytes:
+        return json.dumps(request_alignment(endpoint, request.payload)).encode()
+
+    return Service("/teleop/source/align", schema=schema, handler=handle)
+
+
 def feedback_telemetry(feedback: TeleopFeedback) -> dict[str, Any]:
     action = [float(item) for item in feedback.action[:7]]
     action.extend([None] * (7 - len(action)))
@@ -585,6 +629,7 @@ class FoxgloveTeleopBridge:
         command_endpoint: str,
         host: str,
         port: int,
+        source_control_endpoint: str = DEFAULT_SOURCE_CONTROL_ENDPOINT,
     ) -> None:
         self.zmq_context = zmq.Context()
         self.target_socket = self.zmq_context.socket(zmq.SUB)
@@ -668,7 +713,7 @@ class FoxgloveTeleopBridge:
             host=host,
             port=port,
             capabilities=[Capability.Services],
-            services=build_services(self.router),
+            services=[*build_services(self.router), alignment_service(source_control_endpoint)],
             context=self.foxglove_context,
             message_backlog_size=4,
         )
@@ -848,6 +893,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--target-endpoint", default=DEFAULT_TARGET_ENDPOINT)
     parser.add_argument("--feedback-endpoint", default=DEFAULT_FEEDBACK_ENDPOINT)
     parser.add_argument("--command-endpoint", default=DEFAULT_COMMAND_ENDPOINT)
+    parser.add_argument("--source-control-endpoint", default=DEFAULT_SOURCE_CONTROL_ENDPOINT)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--open-foxglove", action="store_true")
@@ -870,6 +916,7 @@ def main(argv: list[str] | None = None) -> int:
         target_endpoint=args.target_endpoint,
         feedback_endpoint=args.feedback_endpoint,
         command_endpoint=args.command_endpoint,
+        source_control_endpoint=args.source_control_endpoint,
         host=args.host,
         port=args.port,
     )

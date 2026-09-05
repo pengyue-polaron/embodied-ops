@@ -35,11 +35,19 @@ class ControllerScene:
         self.last_position = None
 
     def observe(self, target: TeleopTarget) -> None:
-        key = (target.session_id, target.source_metadata.get("calibration_sha256"))
+        alignment = target.source_metadata.get("alignment")
+        key = (
+            target.session_id,
+            target.source_metadata.get("calibration_sha256"),
+            alignment.get("revision") if isinstance(alignment, dict) else None,
+        )
         if key != self.key:
             self.reset()
             self.key = key
             self.last_seq = None
+        if target.source_metadata.get("calibration_valid") is False:
+            self.disconnect()
+            return
         if not target.tracking_valid or not target.gate_open:
             self.break_trail = True
         if not target.tracking_valid or target.seq == self.last_seq:

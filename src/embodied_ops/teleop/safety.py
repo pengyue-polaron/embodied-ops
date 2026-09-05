@@ -175,12 +175,14 @@ class CartesianTargetGuard:
 
         input_ns = target.host_received_monotonic_ns or target_received_monotonic_ns
         age_ms = None if input_ns is None else max(0.0, (now_ns - input_ns) / 1_000_000.0)
+        alignment = target.source_metadata.get("alignment")
         token = (
             target.session_id,
             target.seq,
             target.host_published_unix_ns,
             target.gate_open,
             target.tracking_valid,
+            alignment.get("revision") if isinstance(alignment, dict) else None,
         )
 
         if age_ms is not None and age_ms > self.max_target_age_ms:
@@ -190,6 +192,10 @@ class CartesianTargetGuard:
         if not target.tracking_valid:
             self._last_token = token
             self._invalidate("tracking_invalid")
+            return self._result(target=None, age_ms=age_ms)
+        if target.source_metadata.get("calibration_valid") is False:
+            self._last_token = token
+            self._invalidate("calibration_required")
             return self._result(target=None, age_ms=age_ms)
         if not target.gate_open:
             self._last_token = token
@@ -217,6 +223,7 @@ class CartesianTargetGuard:
         session_changed = bool(
             self._last_token is not None and target.session_id != self._last_token[0]
         )
+        alignment_changed = bool(self._last_token is not None and token[5] != self._last_token[5])
         input_gap = input_gap_ms is not None and input_gap_ms > self.max_input_gap_ms
         position_jump = bool(
             position_step_m is not None
@@ -244,6 +251,8 @@ class CartesianTargetGuard:
         discontinuity_reason = None
         if session_changed:
             discontinuity_reason = "source_session_changed"
+        elif alignment_changed:
+            discontinuity_reason = "calibration_changed"
         elif input_gap:
             discontinuity_reason = "input_gap"
         elif position_jump:
