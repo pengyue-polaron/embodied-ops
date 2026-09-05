@@ -13,6 +13,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 import zmq
+from .controller_scene import ControllerScene
 from . import (
     TeleopCommand,
     TeleopCommandName,
@@ -31,7 +32,7 @@ from .zmq_transport import (
     TeleopCommandClient,
     TeleopFeedbackReceiver,
 )
-from foxglove.channels import CompressedImageChannel, PoseInFrameChannel
+from foxglove.channels import CompressedImageChannel, PoseInFrameChannel, SceneUpdateChannel
 from foxglove.messages import (
     CompressedImage,
     Pose,
@@ -623,6 +624,11 @@ class FoxgloveTeleopBridge:
         self.target_pose_channel = PoseInFrameChannel(
             "/teleop/controller_target", context=self.foxglove_context
         )
+        self.controller_scene = ControllerScene()
+        self.controller_scene_channel = SceneUpdateChannel(
+            "/teleop/controller_scene", context=self.foxglove_context
+        )
+        self.last_scene_at = 0.0
         self.telemetry_channel = foxglove.Channel(
             "/teleop/telemetry",
             schema=TELEMETRY_SCHEMA,
@@ -689,6 +695,15 @@ class FoxgloveTeleopBridge:
             if latest is not None:
                 self._publish_feedback(*latest)
         self._publish_diagnostics_if_due()
+        now = time.monotonic()
+        if self.latest_target_at is None or now - self.latest_target_at > 0.5:
+            self.controller_scene.disconnect()
+        if now - self.last_scene_at >= 0.1:
+            timestamp_ns = time.time_ns()
+            self.controller_scene_channel.log(
+                self.controller_scene.message(timestamp_ns), log_time=timestamp_ns
+            )
+            self.last_scene_at = now
 
     def _take_targets(self) -> None:
         while True:
@@ -705,6 +720,10 @@ class FoxgloveTeleopBridge:
                 value = status.to_dict()
                 self.latest_source_status = value
                 self.latest_source_at = time.monotonic()
+                if not status.tracking_valid or not status.stream_online:
+                    self.controller_scene.disconnect()
+                elif not status.gate_open:
+                    self.controller_scene.break_trail = True
                 self.tracker_channel.log(value, log_time=timestamp_ns)
             elif topic == DEFAULT_TARGET_TOPIC:
                 try:
@@ -712,6 +731,7 @@ class FoxgloveTeleopBridge:
                 except (KeyError, UnicodeDecodeError, ValueError):
                     continue
                 self.latest_target = target
+                self.controller_scene.observe(target)
                 self.latest_target_at = time.monotonic()
                 timestamp_ns = target.host_published_unix_ns or timestamp_ns
                 self.target_channel.log(target.to_dict(), log_time=timestamp_ns)
@@ -729,6 +749,12 @@ class FoxgloveTeleopBridge:
     def _publish_feedback(
         self, feedback: TeleopFeedback, agent_jpeg: bytes, wrist_jpeg: bytes
     ) -> None:
+        previous = self.latest_feedback
+        if previous is not None and (
+            previous.episode_id != feedback.episode_id
+            or feedback.frame_index < previous.frame_index
+        ):
+            self.controller_scene.reset()
         self.latest_feedback = feedback
         self.latest_feedback_at = time.monotonic()
         timestamp_ns = feedback.timestamp_unix_ns

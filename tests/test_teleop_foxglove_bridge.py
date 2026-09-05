@@ -19,6 +19,7 @@ from embodied_ops.teleop.foxglove_bridge import (
 )
 
 EXPECTED_TOPICS = {
+    "/teleop/controller_scene",
     "/teleop/agent_view",
     "/teleop/wrist_camera",
     "/teleop/eef_pose",

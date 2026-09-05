@@ -150,6 +150,14 @@ ADB, calibration, simulator, or native-action logic. Run the gateway with
 an input source and their own runtime. Each backend repository owns, publishes,
 and explicitly selects its Foxglove organization layout.
 
+The gateway also publishes `/teleop/controller_scene` (`foxglove.SceneUpdate`)
+at 10 Hz, including labeled Right/Forward/Up axes, a live position marker, and
+up to 1,200 recent streaming trajectory segments in `teleop_world` (x/y/z).
+This is calibrated source motion, not a robot end-effector path. Pauses and
+dropouts break the line; stale input hides the marker. Source/profile changes
+and backend episode resets clear history. Backend layouts may opt into this
+native 3D panel without installing another extension.
+
 Backend recorders write `embodied.teleop_step/v1` rows and publish an
 `embodied.teleop_episode/v1` manifest last. The manifest is the completion
 marker: it records operator disposition, training eligibility, termination,

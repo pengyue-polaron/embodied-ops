@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Publish bounded calibrated controller trajectories as native Foxglove 3D
+  scenes with Right/Forward/Up axes and pause, dropout, and reset boundaries.
+
 - Improve Operator Panel tabs on small screens with touch-sized, scroll-snap
   navigation, active-state underlines, hidden scrollbars, and automatic active
   tab centering while preserving the desktop segmented control.
