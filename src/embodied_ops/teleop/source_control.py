@@ -10,7 +10,9 @@ import zmq
 DEFAULT_SOURCE_CONTROL_ENDPOINT = "tcp://127.0.0.1:8133"
 
 
-def request_source_control(endpoint: str, payload: bytes, *, timeout_ms: int = 2000) -> dict[str, Any]:
+def request_source_control(
+    endpoint: str, payload: bytes, *, timeout_ms: int = 2000
+) -> dict[str, Any]:
     """One socket per call: SDK service workers never share a ZMQ socket."""
     try:
         if len(payload) > 8192:
