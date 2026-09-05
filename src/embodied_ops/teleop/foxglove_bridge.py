@@ -291,8 +291,10 @@ def diagnostic_array(
     elif (target.source_metadata if target_fresh and target is not None else source_metadata).get(
         "calibration_valid"
     ) is False:
-        level = DIAGNOSTIC_WARN
-        message = "Calibration needs confirmation"
+        level = DIAGNOSTIC_WARN if tracking_valid and target_fresh else DIAGNOSTIC_ERROR
+        message = (
+            "Calibration needs confirmation" if tracking_valid and target_fresh else "Disconnected"
+        )
     elif gate_known and not gate_open:
         level = DIAGNOSTIC_WARN
         message = "Paused"
