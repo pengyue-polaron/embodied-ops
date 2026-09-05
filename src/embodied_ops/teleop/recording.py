@@ -29,7 +29,7 @@ class TeleopEpisodeProvenance:
     controller_ids: set[str] = field(default_factory=set)
     calibration_ids: set[str] = field(default_factory=set)
     calibration_sha256: set[str] = field(default_factory=set)
-    alignments: dict[str, dict[str, Any]] = field(default_factory=dict)
+    effective_calibrations: dict[str, dict[str, Any]] = field(default_factory=dict)
     _last_seq_by_session: dict[str, int] = field(default_factory=dict, repr=False)
 
     def observe(self, target: TeleopTarget | None) -> None:
@@ -52,9 +52,9 @@ class TeleopEpisodeProvenance:
             self.calibration_ids.add(target.calibration_id)
         if target.calibration_sha256 is not None:
             self.calibration_sha256.add(target.calibration_sha256)
-        alignment = target.source_metadata.get("alignment")
-        if isinstance(alignment, dict) and isinstance(alignment.get("revision"), str):
-            self.alignments[alignment["revision"]] = alignment
+        calibration = target.source_metadata.get("effective_calibration")
+        if target.calibration_sha256 is not None and isinstance(calibration, dict):
+            self.effective_calibrations[target.calibration_sha256] = calibration
 
     def eligibility_issues(self) -> list[str]:
         issues = []
@@ -68,8 +68,6 @@ class TeleopEpisodeProvenance:
             issues.append("target_sequence_regression")
         if len(self.calibration_ids) > 1 or len(self.calibration_sha256) > 1:
             issues.append("mixed_calibration")
-        if len(self.alignments) > 1:
-            issues.append("mixed_alignment")
         if self.sources == {"quest"} and len(self.calibration_sha256) != 1:
             issues.append("missing_quest_calibration_digest")
         return issues
@@ -89,7 +87,7 @@ class TeleopEpisodeProvenance:
             "controller_ids": sorted(self.controller_ids),
             "calibration_ids": sorted(self.calibration_ids),
             "calibration_sha256": sorted(self.calibration_sha256),
-            "alignments": self.alignments,
+            "effective_calibrations": self.effective_calibrations,
             "eligibility_issues": self.eligibility_issues(),
         }
 

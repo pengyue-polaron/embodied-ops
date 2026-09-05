@@ -35,11 +35,10 @@ class ControllerScene:
         self.last_position = None
 
     def observe(self, target: TeleopTarget) -> None:
-        alignment = target.source_metadata.get("alignment")
         key = (
             target.session_id,
             target.source_metadata.get("calibration_sha256"),
-            alignment.get("revision") if isinstance(alignment, dict) else None,
+            target.source_metadata.get("calibration_revision"),
         )
         if key != self.key:
             self.reset()

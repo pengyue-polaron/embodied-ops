@@ -150,6 +150,12 @@ ADB, calibration, simulator, or native-action logic. Run the gateway with
 an input source and their own runtime. Each backend repository owns, publishes,
 and explicitly selects its Foxglove organization layout.
 
+A source can advertise a persistent calibration editor. The compact **Calibrate**
+button requests source calibration without restarting the backend; Finish saves
+and applies the profile in that editor, then B resumes input. See
+[`docs/source-calibration.md`](docs/source-calibration.md) for mode gating,
+re-anchoring, and recording provenance.
+
 The gateway also publishes `/teleop/controller_scene` (`foxglove.SceneUpdate`)
 at 10 Hz, including labeled Right/Forward/Up axes, a live position marker, and
 up to 1,200 recent streaming trajectory segments in `teleop_world` (x/y/z).

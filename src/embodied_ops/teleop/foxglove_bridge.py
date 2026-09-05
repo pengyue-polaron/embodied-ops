@@ -42,7 +42,7 @@ from foxglove.messages import (
     Vector3,
 )
 from foxglove.websocket import Capability, ServiceRequest
-from .source_control import DEFAULT_SOURCE_CONTROL_ENDPOINT, request_alignment
+from .source_control import DEFAULT_SOURCE_CONTROL_ENDPOINT, request_source_control
 
 import foxglove
 from foxglove import MessageSchema, Schema, Service, ServiceSchema
@@ -178,7 +178,7 @@ OPERATOR_STATE_SCHEMA = {
         "active_agent": {"type": ["string", "null"]},
         "replay_index": {"type": ["integer", "null"]},
         "replay_frame_count": {"type": ["integer", "null"]},
-        "alignment": {"type": ["object", "null"], "additionalProperties": True},
+        "calibration_editor": {"type": ["object", "null"], "additionalProperties": True},
     },
     "required": [
         "status",
@@ -293,7 +293,7 @@ def diagnostic_array(
     ) is False:
         level = DIAGNOSTIC_WARN if tracking_valid and target_fresh else DIAGNOSTIC_ERROR
         message = (
-            "Calibration needs confirmation" if tracking_valid and target_fresh else "Disconnected"
+            "Calibrating" if tracking_valid and target_fresh else "Disconnected"
         )
     elif gate_known and not gate_open:
         level = DIAGNOSTIC_WARN
@@ -408,10 +408,10 @@ def operator_state(
     replay_frame_count = feedback_diagnostics.get("arm1_timeline_frames")
     return {
         "status": str(diagnostics["message"]),
-        "alignment": (
-            target.source_metadata.get("alignment")
+        "calibration_editor": (
+            target.source_metadata.get("calibration_editor")
             if target_fresh and target is not None
-            else (source_status or {}).get("source_metadata", {}).get("alignment")
+            else (source_status or {}).get("source_metadata", {}).get("calibration_editor")
             if source_age_sec is not None and source_age_sec <= _SOURCE_STALE_SEC
             else None
         ),
@@ -516,23 +516,21 @@ def build_services(router: CommandRouter) -> list[Service]:
     ]
 
 
-def alignment_service(endpoint: str) -> Service:
+def calibration_service(endpoint: str) -> Service:
     schema = ServiceSchema(
-        "embodied.teleop.SourceAlignment",
+        "embodied.teleop.SourceCalibration",
         request=_json_message_schema(
-            "embodied.teleop.AlignmentRequest",
+            "embodied.teleop.CalibrationRequest",
             {
                 "type": "object",
                 "properties": {
                     "request_id": {"type": "string"},
-                    "revision": {"type": "string"},
-                    "action": {"type": "string", "enum": ["start", "forward", "finish"]},
                 },
-                "required": ["request_id", "revision", "action"],
+                "required": ["request_id"],
             },
         ),
         response=_json_message_schema(
-            "embodied.teleop.AlignmentResponse",
+            "embodied.teleop.CalibrationResponse",
             {
                 "type": "object",
                 "additionalProperties": True,
@@ -541,9 +539,15 @@ def alignment_service(endpoint: str) -> Service:
     )
 
     def handle(request: ServiceRequest) -> bytes:
-        return json.dumps(request_alignment(endpoint, request.payload)).encode()
+        try:
+            data = json.loads(request.payload)
+            payload = {"action": "begin", "request_id": data.get("request_id")}
+            result = request_source_control(endpoint, json.dumps(payload).encode())
+        except (ValueError, AttributeError) as exc:
+            result = {"accepted": False, "applied": False, "message": str(exc)}
+        return json.dumps(result).encode()
 
-    return Service("/teleop/source/align", schema=schema, handler=handle)
+    return Service("/teleop/source/calibrate", schema=schema, handler=handle)
 
 
 def feedback_telemetry(feedback: TeleopFeedback) -> dict[str, Any]:
@@ -715,7 +719,7 @@ class FoxgloveTeleopBridge:
             host=host,
             port=port,
             capabilities=[Capability.Services],
-            services=[*build_services(self.router), alignment_service(source_control_endpoint)],
+            services=[*build_services(self.router), calibration_service(source_control_endpoint)],
             context=self.foxglove_context,
             message_backlog_size=4,
         )

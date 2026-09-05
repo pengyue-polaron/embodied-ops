@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0
+
+- Replace the separate direction-alignment flow with one Calibrate button opening the persistent source editor.
+- Keep simulator observation live during calibration; disable starting a new take while editing.
+- Offer a direct editor link when the client blocks popups.
+
 ## 1.4.0
 
 - Add compact source-owned direction alignment with acknowledged, revision-checked steps.

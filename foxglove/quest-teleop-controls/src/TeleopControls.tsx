@@ -21,7 +21,7 @@ type OperatorState = {
   recording: boolean;
   recording_phase?: string | null;
   active_agent?: string | null;
-  alignment?: { state: string; revision: string; message: string } | null;
+  calibration_editor?: { state: string; active: boolean; url: string } | null;
 };
 
 const OPERATOR_STATE_TOPIC = "/teleop/operator_state";
@@ -221,19 +221,7 @@ function TeleopControls({
   }, []);
 
   const connected = lastStateAt > 0 && now - lastStateAt <= 1500;
-  const alignment = operatorState?.alignment;
-  const alignmentAction =
-    alignment?.state === "right_done"
-      ? "forward"
-      : alignment?.state.startsWith("collecting_") === true
-        ? "finish"
-        : "start";
-  const alignmentLabel =
-    alignmentAction === "forward"
-      ? "Collect forward"
-      : alignmentAction === "finish"
-        ? "Finish"
-        : "Align";
+  const editor = operatorState?.calibration_editor;
   const enabledControls = useMemo(() => {
     if (!connected || operatorState == undefined) {
       return new Set<string>();
@@ -246,7 +234,9 @@ function TeleopControls({
         controls.add("retry-stage");
       }
     } else {
-      controls.add("record");
+      if (operatorState.calibration_editor?.active !== true) {
+        controls.add("record");
+      }
     }
     return controls;
   }, [connected, operatorState]);
@@ -284,28 +274,42 @@ function TeleopControls({
     [context, showNotice],
   );
 
-  const align = async () => {
+  const calibrate = async () => {
     if (
       requestInFlight.current ||
-      alignment == undefined ||
+      editor == undefined ||
       context.callService == undefined
     ) {
       return;
     }
     requestInFlight.current = true;
-    setPending("align");
+    setPending("calibrate");
     try {
-      const response = await context.callService("/teleop/source/align", {
-        action: alignmentAction,
-        revision: alignment.revision,
+      const url = new URL(editor.url);
+      if (!["http:", "https:"].includes(url.protocol)) {
+        throw new Error("Invalid calibration URL");
+      }
+      // Open on the click itself, before awaiting the service, to avoid popup blocking.
+      const page = window.open(url.href, "quest-calibration");
+      if (page) {
+        page.opener = null;
+      }
+      const response = await context.callService("/teleop/source/calibrate", {
         request_id: crypto.randomUUID(),
       });
-      responseMessage(response, "Alignment updated");
-      const next = (response as { alignment?: OperatorState["alignment"] })
-        .alignment;
+      responseMessage(response, "Calibration ready");
+      const next = (
+        response as { editor?: OperatorState["calibration_editor"] }
+      ).editor;
       if (next != undefined) {
         setOperatorState((previous) =>
-          previous ? { ...previous, alignment: next } : previous,
+          previous ? { ...previous, calibration_editor: next } : previous,
+        );
+      }
+      if (!page) {
+        showNotice(
+          "error",
+          "Allow popups, then open the calibration page below",
         );
       }
     } catch (error) {
@@ -319,23 +323,20 @@ function TeleopControls({
   return (
     <div className="teleop-panel" aria-busy={pending != undefined}>
       <div className="teleop-groups">
-        {alignment != undefined && (
+        {editor != undefined && (
           <section className="teleop-group">
-            <h2 className="teleop-group-label">Directions</h2>
-            <div className="teleop-buttons teleop-alignment">
+            <h2 className="teleop-group-label">Setup</h2>
+            <div className="teleop-buttons">
               <button
                 className="teleop-button"
                 type="button"
                 disabled={!connected || pending != undefined}
                 onClick={() => {
-                  void align();
+                  void calibrate();
                 }}
               >
-                {pending === "align" ? "Working…" : alignmentLabel}
+                {pending === "calibrate" ? "Opening…" : "Calibrate"}
               </button>
-              {alignment.state !== "ready" && (
-                <span role="status">{alignment.message}</span>
-              )}
             </div>
           </section>
         )}
@@ -374,6 +375,17 @@ function TeleopControls({
       >
         {notice?.text ?? ""}
       </div>
+      {notice?.tone === "error" &&
+        editor?.active === true &&
+        /^https?:\/\//.test(editor.url) && (
+          <a
+            href={editor.url}
+            target="quest-calibration"
+            rel="noopener noreferrer"
+          >
+            Open calibration page
+          </a>
+        )}
     </div>
   );
 }

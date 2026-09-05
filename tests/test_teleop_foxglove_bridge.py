@@ -256,7 +256,7 @@ def test_operator_state_summarizes_backend_and_view_latency() -> None:
         feedback_age_sec=0.02,
     )
     assert state == {
-        "alignment": None,
+        "calibration_editor": None,
         "status": "Streaming",
         "severity": "ok",
         "source": "Quest · Online",
@@ -559,4 +559,4 @@ def test_live_gateway_advertises_only_canonical_topics_and_services() -> None:
     assert diagnostics_channel["schemaName"] == "diagnostic_msgs/msg/DiagnosticArray"
     assert {service["name"] for service in messages["advertiseServices"]["services"]} == set(
         SERVICE_COMMANDS
-    ) | {"/teleop/source/align"}
+    ) | {"/teleop/source/calibrate"}
