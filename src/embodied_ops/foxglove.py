@@ -23,7 +23,16 @@ MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 COLLECTION_CONSOLE_PANEL_TYPE = "embodied-ops-collection-console.Collection Console"
 COLLECTION_CONSOLE_CONFIG_SCHEMA_VERSION = 1
 FOXGLOVE_WORKFLOW_STATUS_SCHEMA_VERSION = 2
-COLLECTION_SERVICE_NAMES = ("start", "save", "discard", "reset", "stop")
+COLLECTION_SERVICE_NAMES = (
+    "start",
+    "save",
+    "save_without_reset",
+    "enable_reset_after_save",
+    "disable_reset_after_save",
+    "discard",
+    "reset",
+    "stop",
+)
 
 
 @dataclass(frozen=True)

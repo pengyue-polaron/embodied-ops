@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
-from .artifacts import create_only_output_file
+from .artifacts import atomic_output_directory, create_only_output_file
 
 CATALOG_SCHEMA_VERSION = 1
 PROMPT_SCHEMA_VERSION = 1
@@ -97,6 +97,62 @@ def load_task_catalog(path: Path, *, repo_root: Path | None = None) -> TaskCatal
         catalog_id=catalog_id,
         tasks=tuple(task for _order, task in ordered),
     )
+
+
+def create_task_catalog(
+    catalog_path: Path,
+    *,
+    catalog_id: str,
+    task_id: str,
+    prompt: str,
+    distribution: str,
+    repo_root: Path,
+) -> Path:
+    """Atomically create one catalog with its required initial prompt."""
+
+    target = _new_catalog_path(catalog_path, repo_root=repo_root)
+    normalized_catalog_id = _identifier(catalog_id, label="task catalog id")
+    first_task = _parse_prompt(
+        {
+            "schema_version": PROMPT_SCHEMA_VERSION,
+            "order": 10,
+            "id": task_id,
+            "prompt": prompt,
+            "distribution": distribution,
+        },
+        label="initial prompt",
+    )[1]
+    with atomic_output_directory(target.parent, overwrite=False) as staging:
+        prompt_directory = staging / "prompts"
+        prompt_directory.mkdir()
+        (staging / "catalog.json").write_text(
+            json.dumps(
+                {"schema_version": CATALOG_SCHEMA_VERSION, "id": normalized_catalog_id},
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (prompt_directory / f"{first_task.task_id}.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": PROMPT_SCHEMA_VERSION,
+                    "order": 10,
+                    "id": first_task.task_id,
+                    "prompt": first_task.prompt,
+                    "distribution": first_task.distribution,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        staged = load_task_catalog(staging / "catalog.json", repo_root=repo_root)
+        if staged.catalog_id != normalized_catalog_id or staged.tasks != (first_task,):
+            raise RuntimeError("created task catalog does not match the validated candidate")
+    return target
 
 
 def register_task_prompt(
@@ -214,6 +270,27 @@ def _catalog_path(path: Path, *, repo_root: Path | None) -> Path:
                 raise ValueError("task catalog path must not contain symbolic links")
     if candidate.name != "catalog.json" or not candidate.is_file():
         raise ValueError("task catalog must reference an existing catalog.json")
+    return candidate
+
+
+def _new_catalog_path(path: Path, *, repo_root: Path) -> Path:
+    root = repo_root.expanduser().resolve()
+    candidate = path.expanduser()
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    candidate = Path(os.path.abspath(os.fspath(candidate)))
+    allowed = root / "configs/tasks"
+    if not candidate.is_relative_to(allowed):
+        raise ValueError("task catalog must be a repository file under configs/tasks")
+    if candidate.name != "catalog.json" or candidate.parent == allowed:
+        raise ValueError("new task catalog must end in a directory-specific catalog.json")
+    current = root
+    for component in candidate.relative_to(root).parts:
+        current /= component
+        if current.is_symlink():
+            raise ValueError("task catalog path must not contain symbolic links")
+    if candidate.parent.exists():
+        raise FileExistsError(f"task catalog directory already exists: {candidate.parent}")
     return candidate
 
 

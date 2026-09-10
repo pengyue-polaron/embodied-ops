@@ -1,7 +1,7 @@
 # Embodied Ops Collection Console
 
 Reusable Foxglove organization extension for guarded collection controls. A
-robot Runtime supplies the workflow-status topic, five exact ROS Trigger
+robot Runtime supplies the workflow-status topic, eight exact ROS Trigger
 services, and the telemetry stale timeout in the panel state committed with its
 layout. The extension contains no robot names or topic defaults.
 
@@ -12,6 +12,9 @@ forwarding an input to the shared Operator Panel application. The
 `embodied_ops.foxglove` helpers implement that transport-independent validation.
 The compact status renders the Runtime-supplied phase and operator detail, plus
 live capture detail while the recording gate is active.
+The Reset-after-save switch sends separately allowlisted enable/disable actions
+at the ready gate; it does not hold command authority or suppress discard/reset
+actions.
 
 Build with `npm ci && npm run build && npm run lint`. Consuming Runtime
 repositories package this pinned extension and inject their configuration with

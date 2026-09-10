@@ -20,10 +20,12 @@ from embodied_ops import (
     PublishedOutputCleanupError,
     STANDARD_COLLECTION_INTERACTION,
     TaskSelectionCancelled,
+    TaskPrompt,
     add_contract_digest,
     atomic_output_directory,
     atomic_output_file,
     create_only_output_file,
+    create_task_catalog,
     fetch_huggingface_artifact,
     normalize_collection_start,
     normalize_episode_decision,
@@ -409,6 +411,41 @@ def test_task_registry_loads_in_order_and_registers_create_only(tmp_path) -> Non
         register_task_prompt(
             directory / "catalog.json",
             task_id="pear_bowl",
+            prompt="another prompt",
+            distribution="ood",
+            repo_root=root,
+        )
+
+
+def test_task_registry_creates_a_complete_catalog_atomically(tmp_path) -> None:
+    root = tmp_path
+    (root / "configs/tasks").mkdir(parents=True)
+    catalog_path = root / "configs/tasks/button_press/catalog.json"
+
+    created = create_task_catalog(
+        catalog_path,
+        catalog_id="button-press-v1",
+        task_id="press_button_5s",
+        prompt="press and hold the button for 5 seconds, then release it",
+        distribution="train",
+        repo_root=root,
+    )
+
+    assert created == catalog_path
+    catalog = load_task_catalog(created, repo_root=root)
+    assert catalog.catalog_id == "button-press-v1"
+    assert catalog.tasks == (
+        TaskPrompt(
+            task_id="press_button_5s",
+            prompt="press and hold the button for 5 seconds, then release it",
+            distribution="train",
+        ),
+    )
+    with pytest.raises(FileExistsError, match="already exists"):
+        create_task_catalog(
+            catalog_path,
+            catalog_id="button-press-v1",
+            task_id="other",
             prompt="another prompt",
             distribution="ood",
             repo_root=root,

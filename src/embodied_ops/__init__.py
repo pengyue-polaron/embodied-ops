@@ -64,6 +64,7 @@ from .task_registry import (
     TaskCatalog,
     TaskDistribution,
     TaskPrompt,
+    create_task_catalog,
     load_task_catalog,
     register_task_prompt,
 )
@@ -108,6 +109,7 @@ __all__ = [
     "atomic_write_json",
     "atomic_write_text",
     "create_only_output_file",
+    "create_task_catalog",
     "directory_sha256",
     "ensure_code_checkout",
     "ensure_code_environment",

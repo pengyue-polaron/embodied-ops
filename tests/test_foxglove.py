@@ -14,6 +14,9 @@ from embodied_ops.operator_panel import WORKFLOW_STATUS_SCHEMA_VERSION
 SERVICES = {
     "start": "/robot/ops/collection/start",
     "save": "/robot/ops/collection/save",
+    "save_without_reset": "/robot/ops/collection/save_without_reset",
+    "enable_reset_after_save": "/robot/ops/collection/reset_after_save/enable",
+    "disable_reset_after_save": "/robot/ops/collection/reset_after_save/disable",
     "discard": "/robot/ops/collection/discard",
     "reset": "/robot/ops/collection/reset",
     "stop": "/robot/ops/collection/stop",

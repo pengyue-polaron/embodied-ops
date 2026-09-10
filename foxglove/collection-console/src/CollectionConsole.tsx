@@ -32,7 +32,15 @@ type WorkflowStatus = {
   progress: Progress[];
 };
 
-type ServiceName = "start" | "save" | "discard" | "reset" | "stop";
+type ServiceName =
+  | "start"
+  | "save"
+  | "save_without_reset"
+  | "enable_reset_after_save"
+  | "disable_reset_after_save"
+  | "discard"
+  | "reset"
+  | "stop";
 
 type CollectionConsoleConfig = {
   schemaVersion: 1;
@@ -48,7 +56,16 @@ type Control = {
   confirm?: string;
 };
 
-const SERVICE_NAMES: ServiceName[] = ["start", "save", "discard", "reset", "stop"];
+const SERVICE_NAMES: ServiceName[] = [
+  "start",
+  "save",
+  "save_without_reset",
+  "enable_reset_after_save",
+  "disable_reset_after_save",
+  "discard",
+  "reset",
+  "stop",
+];
 
 const CONTROLS: Control[] = [
   {
@@ -104,6 +121,7 @@ function CollectionConsole({ context }: { context: PanelExtensionContext }): Rea
   const [receivedAt, setReceivedAt] = useState(0);
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState<ServiceName>();
+  const [resetAfterSave, setResetAfterSave] = useState(true);
   const [controlError, setControlError] = useState("");
   const [colorScheme, setColorScheme] = useState<"dark" | "light">("dark");
   const [renderDone, setRenderDone] = useState<(() => void) | undefined>();
@@ -157,11 +175,30 @@ function CollectionConsole({ context }: { context: PanelExtensionContext }): Rea
     };
   }, []);
 
+  useEffect(() => {
+    if (status.inputActions.includes("disable_reset_after_save")) {
+      setResetAfterSave(true);
+    } else if (status.inputActions.includes("enable_reset_after_save")) {
+      setResetAfterSave(false);
+    }
+  }, [status.inputActions]);
+
   const stale =
     configuration.config == undefined ||
     receivedAt === 0 ||
     now - receivedAt > configuration.config.staleAfterMs;
   const controlsAvailable = context.callService != undefined;
+  const resetSwitchEnabled =
+    !stale &&
+    busy == undefined &&
+    controlsAvailable &&
+    status.available &&
+    status.active &&
+    status.workflow === "collect" &&
+    status.state === "waiting_for_input" &&
+    status.inputPhase === "ready" &&
+    (status.inputActions.includes("enable_reset_after_save") ||
+      status.inputActions.includes("disable_reset_after_save"));
 
   const invoke = useCallback(
     async (control: Control) => {
@@ -232,6 +269,39 @@ function CollectionConsole({ context }: { context: PanelExtensionContext }): Rea
           </div>
         ))}
       </div>
+
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          marginTop: 10,
+          padding: "9px 12px",
+          border: `1px solid ${palette.border}`,
+          borderRadius: 4,
+          color: resetSwitchEnabled ? palette.text : palette.muted,
+          fontSize: 12,
+          fontWeight: 600,
+          opacity: resetSwitchEnabled ? 1 : 0.55,
+        }}
+      >
+        <span>Reset after save</span>
+        <input
+          type="checkbox"
+          checked={resetAfterSave}
+          disabled={!resetSwitchEnabled}
+          onChange={(event) => {
+            const enable = event.target.checked;
+            void invoke({
+              service: enable ? "enable_reset_after_save" : "disable_reset_after_save",
+              label: enable ? "Enable Reset after save" : "Disable Reset after save",
+              phase: "ready",
+            });
+          }}
+          style={{ width: 18, height: 18 }}
+        />
+      </label>
 
       <section
         style={{
